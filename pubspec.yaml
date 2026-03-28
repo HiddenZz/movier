@@ -10,6 +10,12 @@ dependencies:
   flutter:
     sdk: flutter
 
+  l: ^5.0.1
+  flutter_bloc: ^9.1.1
+  bloc_concurrency: ^0.3.0
+  google_fonts: ^6.3.2
+  dio: ^5.9.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
