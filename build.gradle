@@ -26,7 +26,7 @@ dependencies {
     implementation("com.github.atomashpolskiy:bt-dht:1.10")
 
     // content formatter
-    implementation 'com.github.bramp:ffmpeg-cli-wrapper:master'
+    implementation 'net.bramp.ffmpeg:ffmpeg:0.9.1'
     implementation 'io.lindstrom:m3u8-parser:0.29'
 
     // data

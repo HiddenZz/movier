@@ -27,7 +27,7 @@ public class RedisProgressRepository implements ProgressRepository {
                 String.valueOf(progress.progress())
         );
 
-        redis.expire(headKeyBuilder(type, progress.tmdbId()), Duration.ofHours(1));
+        redis.expire(headKeyBuilder(type, progress.tmdbId()), Duration.ofHours(24));
 
         log.info("Formatting progress {}% for {}", progress.progress(), progress.tmdbId());
     }

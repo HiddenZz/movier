@@ -17,7 +17,7 @@ public class ProgressReporterImpl implements ProgressReporter {
     @Override
     public void downloading(Progress progress) {
         try {
-            redisRepository.set(progress, ProgressType.DOWNLOAD);
+            redisRepository.set(progress, ProgressType.DOWNLOADING);
         } catch (Exception e) {
             log.error("Error during publish download progress for content Uuid:%s, tmdbId:%s".formatted(progress.contentUuid(), progress.tmdbId()), e);
         }

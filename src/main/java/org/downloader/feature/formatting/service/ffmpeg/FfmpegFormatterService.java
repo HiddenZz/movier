@@ -8,6 +8,7 @@ import net.bramp.ffmpeg.FFprobe;
 import net.bramp.ffmpeg.builder.FFmpegBuilder;
 import net.bramp.ffmpeg.probe.FFmpegProbeResult;
 import net.bramp.ffmpeg.probe.FFmpegStream;
+import net.bramp.ffmpeg.shared.CodecType;
 import org.downloader.common.configuration.properties.VideoFormattingProperties;
 import org.downloader.common.exceptions.ConversionSourceNotFoundException;
 import org.downloader.feature.formatting.model.FormattingTask;
@@ -55,7 +56,7 @@ public class FfmpegFormatterService implements FormatterService {
 
             final List<CompletableFuture<CompletedJob>> jobs = formattingProperties.getPresets().stream()
                     .filter((preset) -> probe.getStreams().stream()
-                            .filter((stream) -> stream.codec_type == FFmpegStream.CodecType.VIDEO)
+                            .filter((stream) -> stream.codec_type == CodecType.VIDEO)
                             .anyMatch((stream) -> stream.height >= preset.resolution().height()))
                     .map((preset) -> {
                              try {
@@ -66,6 +67,7 @@ public class FfmpegFormatterService implements FormatterService {
                                          .ffmpegBuilder(
                                                  new FFmpegBuilder()
                                                          .setInput(inputPath.toString())
+                                                         .done()
                                                          .overrideOutputFiles(true)
                                                          .addOutput(outputByPresetDir.resolve("%s".formatted("playlist.m3u8"))
                                                                             .toString())

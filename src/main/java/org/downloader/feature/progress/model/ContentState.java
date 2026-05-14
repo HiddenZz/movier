@@ -52,7 +52,7 @@ public abstract sealed class ContentState implements Name permits
     @Getter
     @Named("COMPLETED")
     public static final class Completed extends ContentState {
-
+        private final String minioPath;
     }
 
     @SuperBuilder

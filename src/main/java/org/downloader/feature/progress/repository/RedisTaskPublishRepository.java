@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.downloader.common.configuration.properties.FormattingEventListenerProperties;
+import org.downloader.common.configuration.properties.ResultPublisherProperties;
 import org.downloader.common.configuration.properties.SaveS3EventListenerProperties;
 import org.downloader.common.exceptions.EventPublishException;
+import org.downloader.feature.progress.model.CompletedResultEvent;
 import org.downloader.feature.progress.model.ContentState;
 import org.downloader.feature.saver.model.SaveS3Task;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -24,6 +26,7 @@ public class RedisTaskPublishRepository implements TaskPublishRepository {
     private final ObjectMapper objectMapper;
     private final FormattingEventListenerProperties formattingEventProperties;
     private final SaveS3EventListenerProperties saveS3EventProperties;
+    private final ResultPublisherProperties resultPublisherProperties;
 
     @Override
     public void addFormatting(ContentState.Downloaded downloaded) {
@@ -42,6 +45,16 @@ public class RedisTaskPublishRepository implements TaskPublishRepository {
             redisTemplate.opsForStream().add(saveS3EventProperties.stream(), Map.of("data", data));
         } catch (JsonProcessingException e) {
             log.error("error when mapping completed task %s".formatted(s3task));
+        }
+    }
+
+    @Override
+    public void addResult(CompletedResultEvent event) {
+        try {
+            final String data = objectMapper.writeValueAsString(event);
+            redisTemplate.opsForStream().add(resultPublisherProperties.stream(), Map.of("data", data));
+        } catch (JsonProcessingException e) {
+            log.error("error when mapping result event %s".formatted(event));
         }
     }
 }

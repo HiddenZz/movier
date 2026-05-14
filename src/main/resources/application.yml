@@ -15,6 +15,9 @@ save-s3-listener:
   consumer: ${HOSTNAME:local}
   group: main-saver-group
 
+result-publisher:
+  stream: result:stream
+
 
 storage:
   s3:

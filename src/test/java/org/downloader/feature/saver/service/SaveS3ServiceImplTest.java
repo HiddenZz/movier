@@ -1,5 +1,7 @@
 package org.downloader.feature.saver.service;
 
+import org.downloader.common.configuration.properties.S3StorageProperties;
+import org.downloader.feature.progress.service.ContentStateReporter;
 import org.downloader.feature.saver.client.MinIoS3Client;
 import org.downloader.feature.saver.model.SaveS3Task;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +25,9 @@ import static org.mockito.Mockito.verify;
 class SaveS3ServiceImplTest {
 
     @Mock
+    private ContentStateReporter stateReporter;
+
+    @Mock
     private MinIoS3Client minIoS3Client;
 
     @Mock
@@ -32,7 +37,8 @@ class SaveS3ServiceImplTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        saveS3Service = new SaveS3ServiceImpl(minIoS3Client, uploader);
+        final S3StorageProperties s3Properties = new S3StorageProperties("content", "application/vnd.apple.mpegurl");
+        saveS3Service = new SaveS3ServiceImpl(stateReporter, minIoS3Client, uploader, s3Properties);
 
         lenient().doAnswer(invocation -> {
             Path path = invocation.getArgument(0);

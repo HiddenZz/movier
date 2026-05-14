@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.downloader.feature.progress.model.ContentState;
 import org.downloader.feature.progress.service.ContentStateReporter;
+import org.downloader.common.configuration.properties.S3StorageProperties;
 import org.downloader.feature.saver.client.MinIoS3Client;
 import org.downloader.feature.saver.model.SaveS3Task;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class SaveS3ServiceImpl implements SaveS3Service {
     private final MediaPlaylistParser mediaPlaylistParser = new MediaPlaylistParser();
     private final MinIoS3Client minIoS3Client;
     private final S3Uploader uploader;
+    private final S3StorageProperties s3StorageProperties;
 
 
     @Override
@@ -83,8 +85,15 @@ public class SaveS3ServiceImpl implements SaveS3Service {
 
             uploader.upload(masterPlaylistPath, inputStream -> minIoS3Client.saveMasterPlaylist(inputStream, task.tmdbId(), task.contentUuid()));
 
-            stateReporter.report(ContentState.Completed.builder().build());
-            
+            final String minioPath = "%s/%s/master.m3u8".formatted(
+                    task.tmdbId(), task.contentUuid());
+
+            stateReporter.report(ContentState.Completed.builder()
+                                         .tmdbId(task.tmdbId())
+                                         .contentUuid(task.contentUuid())
+                                         .minioPath(minioPath)
+                                         .build());
+
         } catch (Exception e) {
             log.error("error during save formatting video to s3", e);
         }

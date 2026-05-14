@@ -58,6 +58,7 @@ public class ContentStateReporterImpl implements ContentStateReporter {
 
     private void handleCompleted(ContentState.Completed state) {
         contentRepository.updateState(toDto(state));
+        eventPublisher.sendResult(state);
     }
 
     private void handleFailed(ContentState.Failed state) {
