@@ -4,4 +4,5 @@ analyzer:
     depend_on_referenced_packages: ignore
     invalid_internal_annotation: ignore
     library_private_types_in_public_api: ignore
+    unintended_html_in_doc_comment: ignore
     unused_element_parameter: ignore

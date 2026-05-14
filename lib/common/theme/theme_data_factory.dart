@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:movier/common/theme/smooth_border_theme.dart';
 
 abstract class ThemeDataFactory {
   static ThemeData light() {
@@ -20,6 +21,7 @@ abstract class ThemeDataFactory {
       surface: background,
       onSurface: onBackground,
       onSurfaceVariant: onBackgroundMuted,
+      errorContainer: Color(0xffE4E0D8),
       surfaceContainerHighest: surfaceVariant,
       outline: outline,
       outlineVariant: const Color(0xFFDDD8D0),
@@ -47,8 +49,11 @@ abstract class ThemeDataFactory {
       labelSmall: bodyStyle.copyWith(fontSize: 11, fontWeight: FontWeight.w600, height: 1.4, letterSpacing: 0.5),
     ).apply(bodyColor: onBackground, displayColor: onBackground);
 
+    final extensions = <ThemeExtension<Object?>>{SmoothBorderTheme(color: Color(0xffC4C8BC))};
+
     return ThemeData(
       useMaterial3: true,
+      extensions: extensions,
       colorScheme: colorScheme,
       textTheme: textTheme,
       scaffoldBackgroundColor: background,
@@ -59,6 +64,8 @@ abstract class ThemeDataFactory {
         scrolledUnderElevation: 1,
         titleTextStyle: headlineStyle.copyWith(fontSize: 20, fontWeight: FontWeight.w600, color: onBackground),
       ),
+      splashColor: colorScheme.primary.withValues(alpha: .5),
+      splashFactory: InkRipple.splashFactory,
       cardTheme: CardThemeData(
         color: Colors.white,
         elevation: 0,
@@ -94,10 +101,14 @@ abstract class ThemeDataFactory {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surfaceVariant,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(24),
           borderSide: const BorderSide(color: primary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: BorderSide(color: colorScheme.error, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         hintStyle: bodyStyle.copyWith(color: onBackgroundMuted, fontSize: 14),
@@ -122,6 +133,7 @@ abstract class ThemeDataFactory {
         selectedLabelStyle: bodyStyle.copyWith(fontSize: 12, fontWeight: FontWeight.w700),
         unselectedLabelStyle: bodyStyle.copyWith(fontSize: 12),
       ),
+
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: background,
         indicatorColor: primary.withValues(alpha: 0.15),

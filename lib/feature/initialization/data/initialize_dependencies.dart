@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:l/l.dart';
+import 'package:movier/common/env/env.dart';
 import 'package:movier/common/model/dependencies.dart';
 
 final class _MutableDependencies implements Dependencies {
@@ -26,6 +29,12 @@ Future<Dependencies> $initializeDependencies(void Function(int progress, String 
   return dependencies;
 }
 
-typedef _InitializationStep = Future<void> Function(Dependencies dependencies);
+typedef _InitializationStep = FutureOr<void> Function(_MutableDependencies dependencies);
 
-final Map<String, _InitializationStep> _initializationSteps = <String, _InitializationStep>{};
+final Map<String, _InitializationStep> _initializationSteps = <String, _InitializationStep>{
+  "http client init": (deps) {
+    final options = BaseOptions(baseUrl: Env.baseUrl);
+
+    deps.dio = Dio(options);
+  },
+};

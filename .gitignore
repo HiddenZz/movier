@@ -43,3 +43,6 @@ app.*.map.json
 
 # Env
 .env
+
+#Meta
+.serena

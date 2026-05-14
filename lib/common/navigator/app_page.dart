@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:movier/feature/downloads/widget/downloads_screen.dart';
 import 'package:movier/feature/home/widget/home_screen.dart';
-import 'package:movier/feature/search/widget/search_screen.dart';
+import 'package:movier/feature/search/widget/filters_screen.dart';
 
 @immutable
 sealed class AppPage extends MaterialPage<void> {
@@ -34,15 +34,20 @@ class HomeRoute extends AppPage {
 
 class SearchRoute extends AppPage {
   SearchRoute()
-      : super(child: const SearchScreen(), name: 'Search', arguments: const <String, Object>{}, key: const ValueKey<String>('Search'));
+    : super(
+        child: const FilterScreen(),
+        name: 'Search',
+        arguments: const <String, Object>{},
+        key: const ValueKey<String>('Search'),
+      );
 }
 
 class DownloadsRoute extends AppPage {
   DownloadsRoute()
-      : super(
-          child: const DownloadsScreen(),
-          name: 'Downloads',
-          arguments: const <String, Object>{},
-          key: const ValueKey<String>('Downloads'),
-        );
+    : super(
+        child: const DownloadsScreen(),
+        name: 'Downloads',
+        arguments: const <String, Object>{},
+        key: const ValueKey<String>('Downloads'),
+      );
 }
