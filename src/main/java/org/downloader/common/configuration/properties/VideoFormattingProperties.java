@@ -11,17 +11,14 @@ import java.util.List;
 @Getter
 public class VideoFormattingProperties {
 
-    private final FfmpegConfig ffmpeg;
+    private final boolean multiPresets;
     private final List<PresetConfig> presets;
     private final OutputConfig output;
 
-    public VideoFormattingProperties(FfmpegConfig ffmpeg, List<PresetConfig> presets, OutputConfig output) {
-        this.ffmpeg = ffmpeg;
+    public VideoFormattingProperties(List<PresetConfig> presets, OutputConfig output, Boolean multiPresets) {
+        this.multiPresets = multiPresets;
         this.presets = presets.stream().filter(PresetConfig::enabled).toList();
         this.output = output;
-    }
-
-    public record FfmpegConfig(String threads) {
     }
 
     public record PresetConfig(

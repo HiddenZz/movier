@@ -1,4 +1,5 @@
 video-formatting:
+  multi-presets: false
   presets:
     - name: "1080p"
       resolution:
