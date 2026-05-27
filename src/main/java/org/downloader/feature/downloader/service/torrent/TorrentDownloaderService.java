@@ -10,6 +10,7 @@ import org.downloader.feature.downloader.service.DownloaderService;
 import org.downloader.feature.downloader.model.torrent.TorrentTask;
 import org.downloader.feature.progress.service.ContentStateReporter;
 import org.downloader.feature.progress.service.ContentStateReporterImpl;
+import org.downloader.feature.progress.service.DownloadingProgressReporter;
 import org.downloader.feature.progress.service.ProgressReporter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -20,15 +21,15 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 
-@ConditionalOnTorrentProfile
+//@ConditionalOnTorrentProfile
 @AllArgsConstructor
-@Service
+//@Service
 @Slf4j
 public class TorrentDownloaderService implements DownloaderService<TorrentTask> {
 
     final BtClientBuilder btClientBuilder;
     final ContentStateReporter contentStateReporter;
-    final ProgressReporter progressReporter;
+    final DownloadingProgressReporter progressReporter;
     final BtProperties properties;
     final RestClient restClient;
 

@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 
+@ConditionalOnTorrentProfile
 @AllArgsConstructor
+@Service
 @Slf4j
 public class MockTorrentDownloaderService implements DownloaderService<TorrentTask> {
 
@@ -22,8 +24,10 @@ public class MockTorrentDownloaderService implements DownloaderService<TorrentTa
     @Override
     public void accept(TorrentTask data) {
         try {
-            final String uuid = "49544514a86aeca26d015b4f542a9c74ebb795b5bcc259da56c3c04a7cd668f8";
+
+            final String uuid = data.payload().cacheGuid();
             final TorrentTask.TorrentPayload payload = data.payload();
+            
 
             final Path file = Path.of(btProperties.tempDir(), "test.avi");
 

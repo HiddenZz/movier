@@ -10,6 +10,7 @@ import org.downloader.feature.progress.model.ContentState;
 import org.downloader.feature.progress.model.Progress;
 import org.downloader.feature.progress.service.ContentStateReporter;
 import org.downloader.feature.progress.service.ContentStateReporterImpl;
+import org.downloader.feature.progress.service.DownloadingProgressReporter;
 import org.downloader.feature.progress.service.ProgressReporter;
 
 import java.nio.file.Path;
@@ -18,7 +19,7 @@ import java.nio.file.Path;
 @AllArgsConstructor
 public class TorrentReporterHelper {
 
-    private final ProgressReporter progressReporter;
+    private final DownloadingProgressReporter progressReporter;
     private final ContentStateReporter contentStateReporter;
     private final TorrentTask.TorrentPayload payload;
     private final Path tempDir;
@@ -37,8 +38,8 @@ public class TorrentReporterHelper {
         log.info("Task: {} | progress: {}% | seeders: {} | peers: {}",
                  payload.cacheGuid().substring(0, 5), progress, payload.seeders(), state.getConnectedPeers());
 
-        progressReporter.downloading(Progress.builder().tmdbId(payload.tmdbId()).contentUuid(payload.cacheGuid())
-                                             .progress(progress).build());
+        progressReporter.set(Progress.builder().tmdbId(payload.tmdbId()).contentUuid(payload.cacheGuid())
+                                     .progress(progress).build());
     }
 
     void downloaded(Torrent torrent, TorrentFile tf) {
@@ -53,6 +54,7 @@ public class TorrentReporterHelper {
                                             .filePath(fullPath.toString())
                                             .tmdbId(payload.tmdbId())
                                             .build());
+        progressReporter.invalidate(payload.tmdbId(), payload.cacheGuid(), "");
     }
 
     void downloadFailed(String cause) {

@@ -6,4 +6,6 @@ import org.downloader.feature.progress.model.ProgressType;
 public interface ProgressRepository {
 
     void set(Progress progress, ProgressType type);
+
+    void invalidate(ProgressType type, long tmdbId, String contentUuid, String quality);
 }

@@ -15,6 +15,7 @@ import org.downloader.feature.formatting.service.FormatterService;
 import org.downloader.feature.progress.model.ContentState;
 import org.downloader.feature.progress.model.Progress;
 import org.downloader.feature.progress.service.ContentStateReporter;
+import org.downloader.feature.progress.service.FormattingProgressReporter;
 import org.downloader.feature.progress.service.ProgressReporter;
 import org.springframework.stereotype.Service;
 
@@ -38,7 +39,7 @@ public class FfmpegFormatterService implements FormatterService {
     private final FFmpegExecutor executor;
     private final VideoFormattingProperties formattingProperties;
     private final ContentStateReporter contentStateReporter;
-    private final ProgressReporter progressReporter;
+    private final FormattingProgressReporter progressReporter;
 
     @Override
     public void accept(FormattingTask task) {
@@ -92,15 +93,19 @@ public class FfmpegFormatterService implements FormatterService {
                     )
                     .filter(Objects::nonNull)
                     .map((job) -> (Supplier<CompletedJob>) () -> {
-                        executor.createJob(job.ffmpegBuilder, progress -> {
-                            final int percentComplete = (int) Math.round(Duration.ofNanos(progress.out_time_ns)
-                                                                                 .toSeconds() / probe.format.duration * 100);
-                            progressReporter.formatting(Progress.builder()
-                                                                .quality(job.config.name())
-                                                                .tmdbId(task.tmdbId())
-                                                                .contentUuid((task.contentUuid()))
-                                                                .progress(percentComplete).build());
-                        }).run();
+                        try {
+                            executor.createJob(job.ffmpegBuilder, progress -> {
+                                final int percentComplete = (int) Math.round(Duration.ofNanos(progress.out_time_ns)
+                                                                                     .toSeconds() / probe.format.duration * 100);
+                                progressReporter.set(Progress.builder()
+                                                             .quality(job.config.name())
+                                                             .tmdbId(task.tmdbId())
+                                                             .contentUuid((task.contentUuid()))
+                                                             .progress(percentComplete).build());
+                            }).run();
+                        } finally {
+                            progressReporter.invalidate(task.tmdbId(), task.contentUuid(), job.config.name());
+                        }
                         return CompletedJob.builder()
                                 .qualityName(job.config.name())
                                 .bandwidth(job.config.audioBitrate() + job.config.videoBitrate())

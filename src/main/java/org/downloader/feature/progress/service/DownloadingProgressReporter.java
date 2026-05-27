@@ -10,12 +10,12 @@ import org.springframework.stereotype.Service;
 @AllArgsConstructor
 @Service
 @Slf4j
-public class ProgressReporterImpl implements ProgressReporter {
+public class DownloadingProgressReporter implements ProgressReporter {
 
     private final ProgressRepository redisRepository;
 
     @Override
-    public void downloading(Progress progress) {
+    public void set(Progress progress) {
         try {
             redisRepository.set(progress, ProgressType.DOWNLOADING);
         } catch (Exception e) {
@@ -24,12 +24,13 @@ public class ProgressReporterImpl implements ProgressReporter {
     }
 
     @Override
-    public void formatting(Progress progress) {
+    public void invalidate(long tmdbId, String contentUuid, String quality) {
         try {
-            redisRepository.set(progress, ProgressType.FORMATTING);
+            redisRepository.invalidate(ProgressType.DOWNLOADING, tmdbId, contentUuid, quality);
         } catch (Exception e) {
-            log.error("Error during publish formatting progress for content Uuid:%s, tmdbId:%s".formatted(progress.contentUuid(), progress.tmdbId()), e);
+            log.error("Error during invalidate downloading progress cache for Uuid:%s, tmdbId:%s".formatted(contentUuid, tmdbId), e);
         }
     }
+
 
 }
