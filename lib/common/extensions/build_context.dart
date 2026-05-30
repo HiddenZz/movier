@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:movier/common/model/dependencies.dart';
 import 'package:movier/common/theme/smooth_border_theme.dart';
+import 'package:movier/feature/details/widget/details_scope.dart';
 import 'package:movier/feature/initialization/widget/dependencies_scope.dart';
 import 'package:movier/feature/search/widget/search_scope.dart';
 
@@ -24,6 +25,9 @@ extension type _Dependencies._(BuildContext _c) {
 
   SearchDependecies get search => SearchDependeciesScope.of(_c, listen: false);
   SearchDependecies get searchOf => SearchDependeciesScope.of(_c);
+
+  DetailsDependecies get details => DetailsDependeciesScope.of(_c, listen: false);
+  DetailsDependecies get detailsOf => DetailsDependeciesScope.of(_c, listen: true);
 }
 
 extension BuildContextExt on BuildContext {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:movier/common/extensions/build_context.dart';
+import 'package:movier/common/navigator/app_navigator.dart';
 import 'package:movier/common/widget/remote_image.dart';
 import 'package:movier/common/widget/sizeble_press_interactive.dart';
 import 'package:movier/feature/search/controller/movie_search_controller.dart';
@@ -130,7 +131,7 @@ class _MovieListState extends State<_MovieList> {
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               mainAxisSpacing: 16,
-              childAspectRatio: 0.55,
+              childAspectRatio: 0.53,
             ),
             itemBuilder: (context, index) => _MoviePreview(movie: results[index]),
             itemCount: results.length,
@@ -144,12 +145,13 @@ class _MovieListState extends State<_MovieList> {
 
 class _MoviePreview extends StatelessWidget {
   const _MoviePreview({super.key, required this.movie});
+
   final MoviePreview movie;
 
   @override
   Widget build(BuildContext context) => InkWell(
     borderRadius: BorderRadius.circular(16),
-    onTap: () {},
+    onTap: () => AppNavigator.push(context, DetailsRoute(movie.id)),
     child: Padding(
       padding: EdgeInsets.all(8),
       child: Column(
@@ -171,6 +173,7 @@ class _MoviePreview extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+              Text('${movie.id}', style: context.thm.textTheme.bodySmall),
             ],
           ),
         ],

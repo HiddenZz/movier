@@ -32,7 +32,7 @@ class _AddressOverlayState extends State<TextFieldOverlayHelper>
         SingleTickerProviderStateMixin<TextFieldOverlayHelper>,
         _AddressOverlayApiMixin,
         _AddressOverlayBuilderMixin,
-        _AddressOverlayOverlayMixin {}
+        _OverlayMixin {}
 
 mixin _AddressOverlayApiMixin on State<TextFieldOverlayHelper> {
   @mustCallSuper
@@ -91,7 +91,7 @@ mixin _AddressOverlayBuilderMixin on _AddressOverlayApiMixin {
   Widget build(BuildContext context) => widget.child;
 }
 
-mixin _AddressOverlayOverlayMixin on _AddressOverlayApiMixin, SingleTickerProviderStateMixin<TextFieldOverlayHelper> {
+mixin _OverlayMixin on _AddressOverlayApiMixin, SingleTickerProviderStateMixin<TextFieldOverlayHelper> {
   final LayerLink _layerLink = LayerLink();
   final GlobalKey _boundaryKey = GlobalKey();
   late final ValueNotifier<bool> _visible = ValueNotifier(false);

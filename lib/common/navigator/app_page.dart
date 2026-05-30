@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:movier/feature/details/widget/details_screen.dart';
 import 'package:movier/feature/downloads/widget/downloads_screen.dart';
 import 'package:movier/feature/home/widget/home_screen.dart';
 import 'package:movier/feature/search/widget/filters_screen.dart';
@@ -33,7 +34,7 @@ class HomeRoute extends AppPage {
 }
 
 class SearchRoute extends AppPage {
-  SearchRoute()
+  const SearchRoute()
     : super(
         child: const FilterScreen(),
         name: 'Search',
@@ -43,11 +44,21 @@ class SearchRoute extends AppPage {
 }
 
 class DownloadsRoute extends AppPage {
-  DownloadsRoute()
+  const DownloadsRoute()
     : super(
         child: const DownloadsScreen(),
         name: 'Downloads',
         arguments: const <String, Object>{},
         key: const ValueKey<String>('Downloads'),
+      );
+}
+
+class DetailsRoute extends AppPage {
+  DetailsRoute(int id)
+    : super(
+        child: DetailsScreen(id: id),
+        name: 'Details',
+        arguments: const <String, Object>{},
+        key: ValueKey<String>('Details:$id'),
       );
 }
