@@ -1,0 +1,185 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "lib/**"
+      - "test/**"
+      - "pubspec.yaml"
+      - "!**/*.g.dart"
+      - "!**/*.freezed.dart"
+      - "!**/*.gr.dart"
+      - "!**/*.gen.dart"
+      - "!**/*.config.dart"
+      - "!**/generated/**"
+      - "!**/app_localizations*.dart"
+      - "!**/firebase_options.dart"
+      - "!**/generated_plugin_registrant.dart"
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.type != 'Bot' &&
+      !contains(github.event.pull_request.title, '[skip review]')
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          # 0 = все ветки и вся история. Нужно, чтобы существовала
+          # ссылка origin/<base> для --merge-base.
+          fetch-depth: 0
+
+      - name: Build filtered diff
+        id: diff
+        run: |
+          git diff --merge-base "origin/${{ github.base_ref }}" -- \
+            ':(exclude)*.g.dart' \
+            ':(exclude)*.freezed.dart' \
+            ':(exclude)*.gr.dart' \
+            ':(exclude)*.gen.dart' \
+            ':(exclude)*.config.dart' \
+            ':(exclude)*/generated/*' \
+            ':(exclude)*app_localizations*.dart' \
+            ':(exclude)*firebase_options.dart' \
+            ':(exclude)*generated_plugin_registrant.dart' \
+            > pr.diff
+
+          lines=$(wc -l < pr.diff)
+          echo "Строк в отфильтрованном диффе: $lines"
+          if [ "$lines" -eq 0 ]; then
+            echo "empty=1" >> "$GITHUB_OUTPUT"
+            echo "После фильтрации ревьюить нечего — пропускаем."
+          else
+            echo "empty=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Claude Code Review
+        if: steps.diff.outputs.empty == '0'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+
+          settings: |
+            {
+              "permissions": {
+                "deny": [
+                  "Read(**/*.g.dart)",
+                  "Read(**/*.freezed.dart)",
+                  "Read(**/*.gr.dart)",
+                  "Read(**/*.gen.dart)",
+                  "Read(**/*.config.dart)",
+                  "Read(**/generated/**)",
+                  "Read(**/app_localizations*.dart)",
+                  "Read(**/firebase_options.dart)",
+                  "Read(**/generated_plugin_registrant.dart)"
+                ]
+              }
+            }
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Ты оркестрируешь код-ревью пул-реквеста мобильного
+            приложения на Flutter. Выполняй шаги строго по порядку.
+
+            Допущения для тебя и субагентов:
+            - Все инструменты рабочие. Не проверяй их пробными вызовами.
+            - Вызывай инструмент, только если он нужен для текущего шага.
+            - Отвечай и комментируй по-русски.
+
+            ВАЖНО ПРО ДИФФ: НЕ вызывай `gh pr diff`. Готовый дифф уже
+            лежит в файле `pr.diff` в корне репозитория — читай его.
+            Из него заранее вычищены генерируемые файлы. Если ты нигде
+            не видишь код, который упоминается в описании PR, — скорее
+            всего он в генерируемом файле, и это нормально. Не пытайся
+            его найти и не сообщай об этом как о проблеме.
+
+            ────────────────────────────────────────────────
+            ШАГ 1. ТРИАЖ — ВЫПОЛНИ ПЕРВЫМ
+
+            Запусти субагента `pr-triage`, передай номер PR.
+            Не читай дифф и не открывай файлы до его ответа.
+
+            Он вернёт `SKIP: <причина>` или `REVIEW: <причина>`.
+
+            Если SKIP — НЕМЕДЛЕННО останови работу. Не запускай
+            bug-hunter, не читай файлы, не оставляй комментариев.
+            Выведи причину в лог и завершись.
+
+            ────────────────────────────────────────────────
+            ШАГ 2. КОНТЕКСТ (только если REVIEW)
+
+            - Прочитай `pr.diff`
+            - Заголовок и описание: `gh pr view <PR>`
+            - Найди корневой CLAUDE.md и CLAUDE.md в директориях
+              изменённых файлов, прочитай их содержимое
+
+            ────────────────────────────────────────────────
+            ШАГ 3. РЕВЬЮ
+
+            Запусти одного субагента `bug-hunter`. Передай ему:
+            - содержимое `pr.diff`
+            - заголовок и описание PR (контекст намерения автора)
+            - содержимое релевантных CLAUDE.md
+
+            Он вернёт находки, отсортированные по серьёзности.
+
+            ────────────────────────────────────────────────
+            ШАГ 4. ВАЛИДАЦИЯ — ДЕЛАЕШЬ САМ, НЕ ДЕЛЕГИРУЕШЬ
+
+            По каждой находке попробуй её ОПРОВЕРГНУТЬ: открой файл,
+            проверь, что путь выполнения достижим, что значение
+            действительно может быть null, что виджет действительно
+            пересобирается, что правило CLAUDE.md распространяется
+            на этот файл.
+
+            Особое внимание находкам про пересборку: если агент
+            не показал, что именно и по какому событию пересобирается —
+            выбрасывай.
+
+            Если для проверки нужен генерируемый файл — считай
+            находку неподтверждённой и выбрасывай её.
+
+            ────────────────────────────────────────────────
+            ШАГ 5. ПУБЛИКАЦИЯ
+
+            1. Inline-комментарии через
+               `mcp__github_inline_comment__create_inline_comment`
+               с `confirmed: true`. Максимум 8 штук, по одному
+               на уникальную проблему. Остальные — списком
+               в итоговый комментарий.
+            2. Для мелких самодостаточных правок прикладывай блок
+               ```suggestion``` с готовым Dart-кодом. Никогда —
+               если сьюджест не чинит проблему целиком. Для правок
+               от 6 строк или в нескольких местах описывай словами.
+            3. Итоговый комментарий через `gh pr comment`: абзац
+               общей оценки и находки, не попавшие в inline.
+               Если находок нет — «Проблем не найдено.»
+
+            НИКОГДА не оставляй комментарии к генерируемым файлам.
+
+            Ссылки на код — с полным SHA:
+            https://github.com/OWNER/REPO/blob/<sha>/lib/file.dart#L10-L15
+
+          claude_args: |
+            --model claude-sonnet-5
+            --max-turns 35
+            --allowedTools "Task,Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(git log:*),Bash(git show:*),mcp__github_inline_comment__create_inline_comment"
