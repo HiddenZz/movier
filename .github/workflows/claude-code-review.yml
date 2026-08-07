@@ -3,20 +3,19 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    # Нельзя одновременно использовать paths и paths-ignore для одного
-    # события. Исключения задаются через "!" внутри paths, порядок важен:
-    # отрицание действует на всё, что совпало выше.
     paths:
       - "lib/**"
       - "test/**"
       - "pubspec.yaml"
       - "!**/*.g.dart"
       - "!**/*.freezed.dart"
+      - "!**/*.gr.dart"
       - "!**/*.gen.dart"
       - "!**/*.config.dart"
       - "!**/generated/**"
       - "!**/app_localizations*.dart"
       - "!**/firebase_options.dart"
+      - "!**/generated_plugin_registrant.dart"
 
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
@@ -42,23 +41,33 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          fetch-depth: 50
+          # 0 = все ветки и вся история. Нужно, чтобы существовала
+          # ссылка origin/<base> для --merge-base.
+          fetch-depth: 0
 
-      # Готовим дифф заранее и вычищаем из него генерённые файлы.
-      # Так модель физически не видит машинный код и не тратит
-      # на него контекст.
       - name: Build filtered diff
+        id: diff
         run: |
           git diff --merge-base "origin/${{ github.base_ref }}" -- \
             ':(exclude)*.g.dart' \
             ':(exclude)*.freezed.dart' \
             ':(exclude)*.gr.dart' \
             ':(exclude)*.gen.dart' \
+            ':(exclude)*.config.dart' \
+            ':(exclude)*/generated/*' \
             ':(exclude)*app_localizations*.dart' \
             ':(exclude)*firebase_options.dart' \
-            ':(exclude)*/generated/*' \
+            ':(exclude)*generated_plugin_registrant.dart' \
             > pr.diff
-          wc -l pr.diff
+
+          lines=$(wc -l < pr.diff)
+          echo "Строк в отфильтрованном диффе: $lines"
+          if [ "$lines" -eq 0 ]; then
+            echo "empty=1" >> "$GITHUB_OUTPUT"
+            echo "После фильтрации ревьюить нечего — пропускаем."
+          else
+            echo "empty=0" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Run Claude Code Review
         if: steps.diff.outputs.empty == '0'
@@ -67,8 +76,6 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
 
-          # Третий слой: даже если модель попытается открыть
-          # генерённый файл напрямую, Read-инструмент откажет.
           settings: |
             {
               "permissions": {
@@ -77,6 +84,7 @@ jobs:
                   "Read(**/*.freezed.dart)",
                   "Read(**/*.gr.dart)",
                   "Read(**/*.gen.dart)",
+                  "Read(**/*.config.dart)",
                   "Read(**/generated/**)",
                   "Read(**/app_localizations*.dart)",
                   "Read(**/firebase_options.dart)",
@@ -99,10 +107,10 @@ jobs:
 
             ВАЖНО ПРО ДИФФ: НЕ вызывай `gh pr diff`. Готовый дифф уже
             лежит в файле `pr.diff` в корне репозитория — читай его.
-            Из него заранее вычищены генерируемые файлы. Если ты нигде не видишь код,
-            который упоминается в описании PR, — скорее всего он
-            в генерируемом файле, и это нормально. Не пытайся его
-            найти и не сообщай об этом как о проблеме.
+            Из него заранее вычищены генерируемые файлы. Если ты нигде
+            не видишь код, который упоминается в описании PR, — скорее
+            всего он в генерируемом файле, и это нормально. Не пытайся
+            его найти и не сообщай об этом как о проблеме.
 
             ────────────────────────────────────────────────
             ШАГ 1. ТРИАЖ — ВЫПОЛНИ ПЕРВЫМ
@@ -132,8 +140,7 @@ jobs:
             - заголовок и описание PR (контекст намерения автора)
             - содержимое релевантных CLAUDE.md
 
-            Он вернёт находки в трёх категориях: логика, верстка,
-            лишний код.
+            Он вернёт находки, отсортированные по серьёзности.
 
             ────────────────────────────────────────────────
             ШАГ 4. ВАЛИДАЦИЯ — ДЕЛАЕШЬ САМ, НЕ ДЕЛЕГИРУЕШЬ
@@ -144,8 +151,8 @@ jobs:
             пересобирается, что правило CLAUDE.md распространяется
             на этот файл.
 
-            Особое внимание находкам про ребилды: если агент
-            не показал, что именно и как часто пересобирается —
+            Особое внимание находкам про пересборку: если агент
+            не показал, что именно и по какому событию пересобирается —
             выбрасывай.
 
             Если для проверки нужен генерируемый файл — считай
@@ -165,8 +172,7 @@ jobs:
                от 6 строк или в нескольких местах описывай словами.
             3. Итоговый комментарий через `gh pr comment`: абзац
                общей оценки и находки, не попавшие в inline.
-               Если находок нет — «Проблем не найдено. Проверены
-               логика, верстка, лишний код и соответствие CLAUDE.md.»
+               Если находок нет — «Проблем не найдено.»
 
             НИКОГДА не оставляй комментарии к генерируемым файлам.
 
