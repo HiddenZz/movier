@@ -96,6 +96,7 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
+            HEAD SHA: ${{ github.event.pull_request.head.sha }}
 
             Ты оркестрируешь код-ревью пул-реквеста мобильного
             приложения на Flutter. Выполняй шаги строго по порядку.
@@ -176,8 +177,9 @@ jobs:
 
             НИКОГДА не оставляй комментарии к генерируемым файлам.
 
-            Ссылки на код — с полным SHA:
-            https://github.com/OWNER/REPO/blob/<sha>/lib/file.dart#L10-L15
+            Ссылки на код собирай ТОЛЬКО из HEAD SHA, указанного выше.
+            НИКОГДА не вычисляй хеш через `git rev-parse`, `git log`
+            или `git show`
 
           claude_args: |
             --model claude-sonnet-5
