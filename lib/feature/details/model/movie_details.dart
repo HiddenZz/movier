@@ -9,18 +9,16 @@ part 'movie_details.g.dart';
 @freezed
 abstract class MovieDetails with _$MovieDetails {
   const factory MovieDetails({
-    required final int id,
-    required final String title,
-    required final String originalTitle,
-    required final String overview,
-    final String? posterPath,
-    final String? backdropPath,
-    required final String releaseDate,
-    required final double voteAverage,
-    required final int voteCount,
-    required final List<Genre> genres,
-    required final int runtime,
-    required final String status,
+    required int tmdbId,
+    required String title,
+    required String overview,
+    required String? posterUrl,
+    required String? backdropPath,
+    required String releaseDate,
+    required double? voteAverage,
+    required int? voteCount,
+    // required final List<Genre> genres,
+    required int? runtime,
   }) = _MovieDetails;
 
   const MovieDetails._();

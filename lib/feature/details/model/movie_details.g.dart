@@ -8,34 +8,26 @@ part of 'movie_details.dart';
 
 _MovieDetails _$MovieDetailsFromJson(Map<String, dynamic> json) =>
     _MovieDetails(
-      id: (json['id'] as num).toInt(),
+      tmdbId: (json['tmdbId'] as num).toInt(),
       title: json['title'] as String,
-      originalTitle: json['originalTitle'] as String,
       overview: json['overview'] as String,
-      posterPath: json['posterPath'] as String?,
+      posterUrl: json['posterUrl'] as String?,
       backdropPath: json['backdropPath'] as String?,
       releaseDate: json['releaseDate'] as String,
-      voteAverage: (json['voteAverage'] as num).toDouble(),
-      voteCount: (json['voteCount'] as num).toInt(),
-      genres: (json['genres'] as List<dynamic>)
-          .map((e) => Genre.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      runtime: (json['runtime'] as num).toInt(),
-      status: json['status'] as String,
+      voteAverage: (json['voteAverage'] as num?)?.toDouble(),
+      voteCount: (json['voteCount'] as num?)?.toInt(),
+      runtime: (json['runtime'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$MovieDetailsToJson(_MovieDetails instance) =>
     <String, dynamic>{
-      'id': instance.id,
+      'tmdbId': instance.tmdbId,
       'title': instance.title,
-      'originalTitle': instance.originalTitle,
       'overview': instance.overview,
-      'posterPath': instance.posterPath,
+      'posterUrl': instance.posterUrl,
       'backdropPath': instance.backdropPath,
       'releaseDate': instance.releaseDate,
       'voteAverage': instance.voteAverage,
       'voteCount': instance.voteCount,
-      'genres': instance.genres,
       'runtime': instance.runtime,
-      'status': instance.status,
     };

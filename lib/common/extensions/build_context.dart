@@ -12,7 +12,7 @@ extension type _Themes._(BuildContext _context) {
 
   TextTheme get textTheme => theme.textTheme;
 
-  SmoothBorderTheme? get smoothBorder => theme.extension<SmoothBorderTheme>();
+  SmoothBorderThemeData get smoothBorder => SmoothBorderTheme.of(_context);
 }
 
 extension type _Sizer._(BuildContext _context) {

@@ -16,7 +16,7 @@ class SmoothBorder extends StatelessWidget {
     child: DecoratedBox(
       decoration: BoxDecoration(
         border: switch (context.thm.smoothBorder) {
-          SmoothBorderTheme(:final color?, :final strokeWidth?)? => Border.all(color: color, width: strokeWidth),
+          SmoothBorderThemeData(:final color?, :final strokeWidth?)? => Border.all(color: color, width: strokeWidth),
           _ => null,
         },
         borderRadius: switch (context.thm.smoothBorder?.borderRadius) {

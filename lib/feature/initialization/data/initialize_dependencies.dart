@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:control/control.dart';
 import 'package:dio/dio.dart';
 import 'package:l/l.dart';
 import 'package:movier/common/env/env.dart';
 import 'package:movier/common/model/dependencies.dart';
+import 'package:movier/common/observers/controller_observer.dart';
 
 final class _MutableDependencies implements Dependencies {
   @override
@@ -36,5 +38,8 @@ final Map<String, _InitializationStep> _initializationSteps = <String, _Initiali
     final options = BaseOptions(baseUrl: Env.baseUrl);
 
     deps.dio = Dio(options);
+  },
+  "Controller Observer": (_) {
+    Controller.observer = DefaultControllerObserver(logger: l);
   },
 };

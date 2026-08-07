@@ -62,7 +62,7 @@ class RemoteImage extends StatelessWidget {
       imageUrl: url,
       fit: fit,
       cacheKey: url,
-      errorWidget: (_, _, _) {
+      errorWidget: (e, e1, e2) {
         final child = DecoratedBox(
           decoration: BoxDecoration(
             color: errorBackgroundColor ?? context.thm.colorScheme.errorContainer,

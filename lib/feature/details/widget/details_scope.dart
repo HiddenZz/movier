@@ -1,7 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:movier/common/extensions/build_context.dart';
+import 'package:movier/feature/details/controller/movie_detail_controller.dart';
 import 'package:movier/feature/details/controller/seeds_controller.dart';
 import 'package:movier/feature/details/controller/torrent_controller.dart';
+import 'package:movier/feature/details/data/movie_repository.dart';
 import 'package:movier/feature/details/data/seeds_repository.dart';
 import 'package:movier/feature/details/data/torrent_repository.dart';
 
@@ -26,6 +28,7 @@ class DetailsScope extends StatefulWidget {
 class _DetailsScopeState extends State<DetailsScope> {
   late final SeedsController seedsController;
   late final TorrentController torrentController;
+  late final MovieDetailController movieDetailController;
 
   /* #region Lifecycle */
   @override
@@ -34,12 +37,14 @@ class _DetailsScopeState extends State<DetailsScope> {
 
     seedsController = SeedsController(repository: SeedsRepositoryImpl(dio: context.scops.deps.dio));
     torrentController = TorrentController(repository: TorrentRepositoryImpl(dio: context.scops.deps.dio));
+    movieDetailController = MovieDetailController(movieRepository: MovieRepositoryImpl(dio: context.scops.deps.dio));
   }
 
   @override
   void dispose() {
     seedsController.dispose();
     torrentController.dispose();
+    movieDetailController.dispose();
 
     super.dispose();
   }
@@ -47,12 +52,20 @@ class _DetailsScopeState extends State<DetailsScope> {
 
   @override
   Widget build(BuildContext context) => DetailsDependeciesScope(
-    deps: (seedsController: seedsController, torrentController: torrentController),
+    deps: (
+      seedsController: seedsController,
+      torrentController: torrentController,
+      movieDetailController: movieDetailController,
+    ),
     child: widget.child,
   );
 }
 
-typedef DetailsDependecies = ({SeedsController seedsController, TorrentController torrentController});
+typedef DetailsDependecies = ({
+  SeedsController seedsController,
+  TorrentController torrentController,
+  MovieDetailController movieDetailController,
+});
 
 /// {@template details_scope}
 /// _DetailsDepsInherited widget.

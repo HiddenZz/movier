@@ -18,6 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final List<Widget> _tabs = [
     AppNavigator(pages: [SearchRoute()]),
     AppNavigator(pages: [DownloadsRoute()]),
+    AppNavigator(pages: [const TestPlayerRoute()]),
   ];
 
   @override
@@ -41,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.search), label: ''),
           NavigationDestination(icon: Icon(Icons.downloading_outlined), label: ''),
+          NavigationDestination(icon: Icon(Icons.play_circle_outline), label: ''),
         ],
       ),
     ),

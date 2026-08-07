@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:movier/feature/details/widget/details_screen.dart';
 import 'package:movier/feature/downloads/widget/downloads_screen.dart';
 import 'package:movier/feature/home/widget/home_screen.dart';
+import 'package:movier/feature/player/widget/test_player_screen.dart';
 import 'package:movier/feature/search/widget/filters_screen.dart';
 
 @immutable
@@ -60,5 +61,15 @@ class DetailsRoute extends AppPage {
         name: 'Details',
         arguments: const <String, Object>{},
         key: ValueKey<String>('Details:$id'),
+      );
+}
+
+class TestPlayerRoute extends AppPage {
+  const TestPlayerRoute()
+    : super(
+        child: const TestPlayerScreen(),
+        name: 'TestPlayer',
+        arguments: const <String, Object>{},
+        key: const ValueKey<String>('TestPlayer'),
       );
 }

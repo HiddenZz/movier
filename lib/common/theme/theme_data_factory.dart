@@ -49,7 +49,7 @@ abstract class ThemeDataFactory {
       labelSmall: bodyStyle.copyWith(fontSize: 11, fontWeight: FontWeight.w600, height: 1.4, letterSpacing: 0.5),
     ).apply(bodyColor: onBackground, displayColor: onBackground);
 
-    final extensions = <ThemeExtension<Object?>>{SmoothBorderTheme(color: Color(0xffC4C8BC))};
+    final extensions = <ThemeExtension<Object?>>{SmoothBorderThemeData(color: Color(0xffC4C8BC))};
 
     return ThemeData(
       useMaterial3: true,
