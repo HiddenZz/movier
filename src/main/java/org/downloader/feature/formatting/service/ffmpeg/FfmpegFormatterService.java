@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -54,7 +55,12 @@ public class FfmpegFormatterService implements FormatterService {
 
             final FFmpegProbeResult probe = ffprobe.probe(inputPath.toString());
 
+            probe.getStreams().stream()
+                    .filter(stream -> stream.codec_type == CodecType.VIDEO)
+                    .forEach(stream -> log.warn("PROBE video stream: {}x{} codec={}", stream.width, stream.height, stream.codec_name));
+
             final List<CompletableFuture<CompletedJob>> jobs = formattingProperties.getPresets().stream()
+                    .sorted(Comparator.comparingInt(config -> -config.resolution().height()))
                     .filter(preset -> probe.getStreams().stream()
                             .filter(stream -> stream.codec_type == CodecType.VIDEO)
                             .anyMatch(stream -> stream.height >= preset.resolution().height()))
@@ -67,22 +73,31 @@ public class FfmpegFormatterService implements FormatterService {
                                          .config(preset)
                                          .ffmpegBuilder(
                                                  new FFmpegBuilder()
-                                                         .setInput(inputPath.toString())
+                                                         .addInput(inputPath.toString())
+                                                         .addExtraArgs("-fflags", "+genpts")
                                                          .done()
                                                          .overrideOutputFiles(true)
-                                                         .addOutput(outputByPresetDir.resolve("%s".formatted("playlist.m3u8"))
-                                                                            .toString())
+                                                         .addOutput(outputByPresetDir.resolve("playlist.m3u8").toString())
                                                          .setFormat("hls")
+                                                         .addExtraArgs("-map", "0:v:0")
+                                                         .addExtraArgs("-map", "0:a:0?")
+                                                         .setVideoCodec(preset.videoCodec())
+                                                         .setConstantRateFactor(preset.crf())
+                                                         .setPreset(preset.preset())
+                                                         .setVideoFilter("scale=-2:%d".formatted(preset.resolution()
+                                                                                                         .height()))
+                                                         .addExtraArgs("-pix_fmt", "yuv420p")
+                                                         .addExtraArgs("-maxrate", String.valueOf(preset.videoBitrate()))
+                                                         .addExtraArgs("-bufsize", String.valueOf(preset.videoBitrate() * 2))
+                                                         .setAudioCodec(preset.audioCodec())
+                                                         .setAudioBitRate(preset.audioBitrate())
+                                                         .setAudioChannels(2)
                                                          .addExtraArgs("-hls_time", "10")
+                                                         .addExtraArgs("-hls_playlist_type", "vod")
                                                          .addExtraArgs("-hls_list_size", "0")
                                                          .addExtraArgs("-hls_segment_filename",
                                                                        outputByPresetDir.resolve("segment_%03d.ts")
                                                                                .toString())
-                                                         .setVideoCodec(preset.videoCodec())
-                                                         .setAudioCodec(preset.audioCodec())
-                                                         .setVideoQuality(preset.crf())
-                                                         .setPreset(preset.preset())
-                                                         .setAudioBitRate(preset.audioBitrate())
                                                          .done())
                                          .build();
                              } catch (Exception e) {

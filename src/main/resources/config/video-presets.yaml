@@ -45,7 +45,7 @@ video-formatting:
       audioBitrate: 96_000
       videoCodec: "libx264"
       audioCodec: "aac"
-      crf: 20
+      crf: 23
       preset: "medium"
       enabled: true
 

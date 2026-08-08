@@ -27,7 +27,10 @@ public class MockTorrentDownloaderService implements DownloaderService<TorrentTa
 
             final String uuid = data.payload().cacheGuid();
             final TorrentTask.TorrentPayload payload = data.payload();
-            
+            contentStateReporterImpl.report(ContentState.Downloading.builder()
+                                                    .tmdbId(payload.tmdbId())
+                                                    .contentUuid(payload.cacheGuid())
+                                                    .build());
 
             final Path file = Path.of(btProperties.tempDir(), "test.avi");
 
