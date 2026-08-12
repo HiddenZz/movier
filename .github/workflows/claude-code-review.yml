@@ -4,9 +4,15 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
+      # Dart
       - "lib/**"
       - "test/**"
       - "pubspec.yaml"
+      # Нативн
+      - "android/**"
+      - "ios/**"
+      - "packages/**"
+      # Генерируемое
       - "!**/*.g.dart"
       - "!**/*.freezed.dart"
       - "!**/*.gr.dart"
@@ -16,6 +22,12 @@ on:
       - "!**/app_localizations*.dart"
       - "!**/firebase_options.dart"
       - "!**/generated_plugin_registrant.dart"
+      - "!ios/Pods/**"
+      - "!ios/Flutter/Generated.xcconfig"
+      - "!**/build/**"
+      - "!**/*.pbxproj"
+      - "!**/xcuserdata/**"
+      - "!**/Podfile.lock"
 
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
@@ -29,48 +41,139 @@ jobs:
       !contains(github.event.pull_request.title, '[skip review]')
 
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
+
+    env:
+      # Потолок размера ревьюируемого диффа
+      MAX_DIFF_LINES: ${{ vars.MAX_DIFF_LINES || '2500' }}
+      REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'claude-sonnet-5' }}
+      REVIEW_MAX_TURNS: ${{ vars.REVIEW_MAX_TURNS || '40' }}
+      # Маркер служебного комментария с последним отревьюенным SHA
+      STATE_MARKER: "claude-review-state"
 
     permissions:
       contents: read
       pull-requests: write
-      issues: read
+      issues: write
       id-token: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          # 0 = все ветки и вся история. Нужно, чтобы существовала
-          # ссылка origin/<base> для --merge-base.
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Build filtered diff
+      - name: Build review diff
         id: diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          REPO: ${{ github.repository }}
         run: |
-          git diff --merge-base "origin/${{ github.base_ref }}" -- \
-            ':(exclude)*.g.dart' \
-            ':(exclude)*.freezed.dart' \
-            ':(exclude)*.gr.dart' \
-            ':(exclude)*.gen.dart' \
-            ':(exclude)*.config.dart' \
-            ':(exclude)*/generated/*' \
-            ':(exclude)*app_localizations*.dart' \
-            ':(exclude)*firebase_options.dart' \
-            ':(exclude)*generated_plugin_registrant.dart' \
-            > pr.diff
+          set -euo pipefail
 
-          lines=$(wc -l < pr.diff)
-          echo "Строк в отфильтрованном диффе: $lines"
-          if [ "$lines" -eq 0 ]; then
-            echo "empty=1" >> "$GITHUB_OUTPUT"
-            echo "После фильтрации ревьюить нечего — пропускаем."
+          # Дефолт на случай, если переменная не задана или пустая.
+          # MAX_DIFF_LINES=0 полностью отключает лимит.
+          MAX_DIFF_LINES="${MAX_DIFF_LINES:-2500}"
+
+          # --- ищем чекпоинт прошлого ревью -------------------------
+          LAST_SHA=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.body | contains(\"$STATE_MARKER:\")) | .body] | last // empty" \
+            | sed -n "s/.*$STATE_MARKER:\([0-9a-f]\{40\}\).*/\1/p" | head -n1 || true)
+
+          MODE="full"
+          FROM="$BASE_SHA"
+
+          if [ -n "$LAST_SHA" ] \
+            && git cat-file -e "${LAST_SHA}^{commit}" 2>/dev/null \
+            && git merge-base --is-ancestor "$LAST_SHA" "$HEAD_SHA"; then
+            MODE="incremental"
+            FROM="$LAST_SHA"
+          fi
+          # force-push / rebase → LAST_SHA больше не предок head,
+          # объекта может не быть локально → честно падаем в full.
+
+          echo "Режим ревью: $MODE (от ${FROM:0:8} до ${HEAD_SHA:0:8})"
+
+          # --- строим дифф ------------------------------------------
+          EXCLUDES=(
+            ':(exclude)*.g.dart'
+            ':(exclude)*.freezed.dart'
+            ':(exclude)*.gr.dart'
+            ':(exclude)*.gen.dart'
+            ':(exclude)*.config.dart'
+            ':(exclude)*/generated/*'
+            ':(exclude)*app_localizations*.dart'
+            ':(exclude)*firebase_options.dart'
+            ':(exclude)*generated_plugin_registrant.dart'
+            ':(exclude)ios/Pods/*'
+            ':(exclude)ios/Flutter/Generated.xcconfig'
+            ':(exclude)*/build/*'
+            ':(exclude)*.pbxproj'
+            ':(exclude)*xcuserdata/*'
+            ':(exclude)Podfile.lock'
+            ':(exclude)pubspec.lock'
+            ':(exclude)gradlew'
+            ':(exclude)gradlew.bat'
+            ':(exclude)*/gradle/wrapper/*'
+          )
+
+          if [ "$MODE" = "full" ]; then
+            git diff -M -U10 --merge-base "$FROM" "$HEAD_SHA" -- "${EXCLUDES[@]}" > pr.diff
           else
-            echo "empty=0" >> "$GITHUB_OUTPUT"
+            git diff -M -U10 "$FROM" "$HEAD_SHA" -- "${EXCLUDES[@]}" > pr.diff
           fi
 
+          TOTAL=$(wc -l < pr.diff)
+
+          # --- детерминированный триаж ------------------------------
+          # Считаем только осмысленные изменённые строки: выкидываем
+          # заголовки диффа, пустые строки и строки-комментарии.
+          CODE_LINES=$(grep -E '^[+-]' pr.diff \
+            | grep -Ev '^(\+\+\+|---)' \
+            | sed -E 's/^[+-][[:space:]]*//' \
+            | grep -Ev '^$' \
+            | grep -Ev '^(//|///|#|\*|/\*|\*/|<!--|<!)' \
+            | wc -l || true)
+
+          echo "Всего строк в диффе: $TOTAL, содержательных: $CODE_LINES"
+
+          SKIP=0
+          REASON=""
+          if [ "$TOTAL" -eq 0 ]; then
+            SKIP=1; REASON="после фильтрации ревьюить нечего"
+          elif [ "$CODE_LINES" -eq 0 ]; then
+            SKIP=1; REASON="только комментарии, пустые строки и форматирование"
+          elif [ "$MAX_DIFF_LINES" -gt 0 ] && [ "$TOTAL" -gt "$MAX_DIFF_LINES" ]; then
+            SKIP=2; REASON="дифф $TOTAL строк, лимит $MAX_DIFF_LINES"
+          fi
+
+          {
+            echo "skip=$SKIP"
+            echo "reason=$REASON"
+            echo "mode=$MODE"
+            echo "from=$FROM"
+            echo "total=$TOTAL"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$SKIP" -ne 0 ]; then
+            echo "::notice::Ревью пропущено — $REASON"
+          fi
+
+      - name: Comment on oversized PR
+        if: steps.diff.outputs.skip == '2'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" --body \
+          "🤖 Авто-ревью пропущено: ${{ steps.diff.outputs.reason }}.
+          Разбейте PR на части или запустите ревью вручную комментарием \`@claude отревьюй этот PR\`."
+
       - name: Run Claude Code Review
-        if: steps.diff.outputs.empty == '0'
+        if: steps.diff.outputs.skip == '0'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -88,7 +191,9 @@ jobs:
                   "Read(**/generated/**)",
                   "Read(**/app_localizations*.dart)",
                   "Read(**/firebase_options.dart)",
-                  "Read(**/generated_plugin_registrant.dart)"
+                  "Read(**/generated_plugin_registrant.dart)",
+                  "Read(ios/Pods/**)",
+                  "Read(**/build/**)"
                 ]
               }
             }
@@ -97,91 +202,117 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
             HEAD SHA: ${{ github.event.pull_request.head.sha }}
+            РЕЖИМ РЕВЬЮ: ${{ steps.diff.outputs.mode }}
+            ДИАПАЗОН: ${{ steps.diff.outputs.from }} .. ${{ github.event.pull_request.head.sha }}
 
-            Ты оркестрируешь код-ревью пул-реквеста мобильного
-            приложения на Flutter. Выполняй шаги строго по порядку.
+            Ты оркестрируешь код-ревью пул-реквеста мобильного приложения
+            на Flutter (iOS + Android). Выполняй шаги строго по порядку.
 
-            Допущения для тебя и субагентов:
-            - Все инструменты рабочие. Не проверяй их пробными вызовами.
-            - Вызывай инструмент, только если он нужен для текущего шага.
-            - Отвечай и комментируй по-русски.
+            Допущения для тебя и субагента:
+            - Все инструменты рабочие. Не проверяй их пробными вызовами
+            - Вызывай инструмент, только если он нужен для текущего шага
+            - Отвечай и комментируй по-русски
 
-            ВАЖНО ПРО ДИФФ: НЕ вызывай `gh pr diff`. Готовый дифф уже
-            лежит в файле `pr.diff` в корне репозитория — читай его.
-            Из него заранее вычищены генерируемые файлы. Если ты нигде
-            не видишь код, который упоминается в описании PR, — скорее
-            всего он в генерируемом файле, и это нормально. Не пытайся
-            его найти и не сообщай об этом как о проблеме.
+            ПРО ДИФФ: НЕ вызывай `gh pr diff`. Готовый дифф лежит
+            в файле `pr.diff` в корне репозитория — читай его. Из него
+            вычищены генерируемые файлы, Pods, артефакты сборки. Если
+            упомянутого в описании PR кода нигде нет — он в генерируемом
+            файле, это нормально, не ищи его и не сообщай об этом.
 
-            ────────────────────────────────────────────────
-            ШАГ 1. ТРИАЖ — ВЫПОЛНИ ПЕРВЫМ
-
-            Запусти субагента `pr-triage`, передай номер PR.
-            Не читай дифф и не открывай файлы до его ответа.
-
-            Он вернёт `SKIP: <причина>` или `REVIEW: <причина>`.
-
-            Если SKIP — НЕМЕДЛЕННО останови работу. Не запускай
-            bug-hunter, не читай файлы, не оставляй комментариев.
-            Выведи причину в лог и завершись.
+            ПРО РЕЖИМ: если режим `incremental`, в `pr.diff` только
+            коммиты, добавленные ПОСЛЕ прошлого ревью. Более ранние
+            изменения этого PR уже отревьюены — не возвращайся к ним.
+            Код вне диффа читай как контекст, но находками он не является.
 
             ────────────────────────────────────────────────
-            ШАГ 2. КОНТЕКСТ (только если REVIEW)
+            ШАГ 1. КОНТЕКСТ
 
             - Прочитай `pr.diff`
             - Заголовок и описание: `gh pr view <PR>`
             - Найди корневой CLAUDE.md и CLAUDE.md в директориях
-              изменённых файлов, прочитай их содержимое
+              изменённых файлов, прочитай их
 
             ────────────────────────────────────────────────
-            ШАГ 3. РЕВЬЮ
+            ШАГ 2. РЕВЬЮ
 
             Запусти одного субагента `bug-hunter`. Передай ему:
             - содержимое `pr.diff`
-            - заголовок и описание PR (контекст намерения автора)
+            - режим ревью и диапазон коммитов
+            - заголовок и описание PR (намерение автора)
             - содержимое релевантных CLAUDE.md
+
+            Если в диффе есть нативные файлы (Kotlin/Java/Swift/ObjC,
+            манифесты, Info.plist, gradle) — явно скажи об этом
+            субагенту и попроси проверить согласованность нативной
+            и Dart-стороны.
 
             Он вернёт находки, отсортированные по серьёзности.
 
             ────────────────────────────────────────────────
-            ШАГ 4. ВАЛИДАЦИЯ — ДЕЛАЕШЬ САМ, НЕ ДЕЛЕГИРУЕШЬ
+            ШАГ 3. ВАЛИДАЦИЯ — ДЕЛАЕШЬ САМ, НЕ ДЕЛЕГИРУЕШЬ
 
             По каждой находке попробуй её ОПРОВЕРГНУТЬ: открой файл,
-            проверь, что путь выполнения достижим, что значение
-            действительно может быть null, что виджет действительно
-            пересобирается, что правило CLAUDE.md распространяется
-            на этот файл.
+            проверь, что описанное место в коде действительно такое,
+            отследи трейс вызовов, смоделируй реальную ситуацию (не
+            выдуманный корнер-кейс), в которой ошибка проявится.
+            Не получилось — выбрасывай находку.
 
-            Особое внимание находкам про пересборку: если агент
-            не показал, что именно и по какому событию пересобирается —
-            выбрасывай.
+            Для находок про MethodChannel/EventChannel обязательно
+            открой обе стороны — Dart и натив — и сверь имя канала,
+            имя метода, ключи и типы аргументов.
 
-            Если для проверки нужен генерируемый файл — считай
-            находку неподтверждённой и выбрасывай её.
+            Если для проверки нужен генерируемый файл — находка
+            считается неподтверждённой, выбрасывай.
 
             ────────────────────────────────────────────────
-            ШАГ 5. ПУБЛИКАЦИЯ
+            ШАГ 4. ПУБЛИКАЦИЯ
 
             1. Inline-комментарии через
                `mcp__github_inline_comment__create_inline_comment`
-               с `confirmed: true`. Максимум 8 штук, по одному
-               на уникальную проблему. Остальные — списком
-               в итоговый комментарий.
+               с `confirmed: true`. Максимум 5 штук, по одному
+               на уникальную проблему. Остальные — списком в итоговый
+               комментарий.
             2. Для мелких самодостаточных правок прикладывай блок
-               ```suggestion``` с готовым Dart-кодом. Никогда —
-               если сьюджест не чинит проблему целиком. Для правок
+               ```suggestion``` с готовым кодом. Никогда — если
+               сьюджест не чинит проблему целиком. Для правок
                от 6 строк или в нескольких местах описывай словами.
-            3. Итоговый комментарий через `gh pr comment`: абзац
-               общей оценки и находки, не попавшие в inline.
-               Если находок нет — «Проблем не найдено.»
+            3. Итоговый комментарий через `gh pr comment`: абзац общей
+               оценки и находки, не попавшие в inline. Если находок
+               нет — «Проблем не найдено.»
 
-            НИКОГДА не оставляй комментарии к генерируемым файлам.
+            НИКОГДА не оставляй комментарии к генерируемым файлам,
+            к содержимому `ios/Pods` и к артефактам сборки.
 
             Ссылки на код собирай ТОЛЬКО из HEAD SHA, указанного выше.
-            НИКОГДА не вычисляй хеш через `git rev-parse`, `git log`
-            или `git show`
+            Не подставляй в ссылки хеши, полученные из `git log`
+            или `git show` — эти команды нужны тебе для чтения истории,
+            а не для вычисления SHA для permalink'ов.
 
           claude_args: |
-            --model claude-sonnet-5
-            --max-turns 35
-            --allowedTools "Task,Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(git log:*),Bash(git show:*),mcp__github_inline_comment__create_inline_comment"
+            --model ${{ env.REVIEW_MODEL }}
+            --max-turns ${{ env.REVIEW_MAX_TURNS }}
+            --allowedTools "Task,Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git diff:*),mcp__github_inline_comment__create_inline_comment"
+
+    
+      - name: Save review checkpoint
+        if: steps.diff.outputs.skip == '0' && success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          BODY=$(printf '%s\n\n%s' \
+            "<!-- $STATE_MARKER:$HEAD_SHA -->" \
+            "🤖 Claude отревьюил PR до коммита \`${HEAD_SHA:0:7}\`. Следующий прогон посмотрит только новые коммиты.")
+
+          CID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.body | contains(\"$STATE_MARKER:\")) | .id] | last // empty" || true)
+
+          if [ -n "$CID" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$CID" -f body="$BODY" --silent
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$BODY" --silent
+          fi
