@@ -57,7 +57,7 @@ jobs:
       # Потолок размера ревьюируемого диффа.
       MAX_DIFF_LINES: ${{ vars.MAX_DIFF_LINES || '3000' }}
       REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'claude-sonnet-5' }}
-      REVIEW_MAX_TURNS: ${{ vars.REVIEW_MAX_TURNS || '40' }}
+      REVIEW_MAX_TURNS: ${{ vars.REVIEW_MAX_TURNS || '70' }}
       # Маркер комментария с последним отревьюенным SHA
       STATE_MARKER: "claude-review-state"
       REVIEW_LABEL: "claude-review"
@@ -68,6 +68,7 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
+      actions: read
 
     steps:
       - name: Checkout repository
@@ -191,6 +192,9 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           track_progress: true
 
+          additional_permissions: |
+            actions: read
+
           settings: |
             {
               "permissions": {
@@ -285,9 +289,12 @@ jobs:
                ```suggestion``` с готовым кодом. Никогда — если
                сьюджест не чинит проблему целиком. Для правок
                от 6 строк или в нескольких местах описывай словами.
-            3. Итоговый комментарий через `gh pr comment`: абзац общей
-               оценки и находки, не попавшие в inline. Если находок
-               нет — «Проблем не найдено.»
+            3. Итоговый текст — через
+               `mcp__github_comment__update_claude_comment`, ОДНИМ
+               вызовом в самом конце: абзац общей оценки и находки,
+               не попавшие в inline. Если находок нет — «Проблем
+               не найдено.» НЕ используй `gh pr comment`: шаблон
+               action ведёт один комментарий, второй создавать нельзя.
 
             НИКОГДА не оставляй комментарии к генерируемым файлам,
             к содержимому `ios/Pods` и к артефактам сборки.
@@ -297,10 +304,27 @@ jobs:
             или `git show` — эти команды нужны тебе для чтения истории,
             а не для вычисления SHA для permalink'ов.
 
+            БЮДЖЕТ ХОДОВ — ЖЁСТКОЕ ОГРАНИЧЕНИЕ
+
+            У тебя ограниченное число вызовов инструментов, и прогон,
+            упёршийся в лимит, не публикует НИЧЕГО. Поэтому:
+
+            - Чеклист прогресса обнови максимум дважды: один раз
+              в начале и один раз в конце. Не отмечай каждый пункт
+              отдельным вызовом
+            - Не читай файл целиком, если нужный кусок уже есть
+              в `pr.diff`. Открывай файл только когда надо увидеть
+              код ЗА пределами диффа
+            - Валидируй максимум 6 находок, начиная с самых серьёзных.
+              Остальные отбрось без проверки
+            - Если израсходовано примерно 90% ходов — немедленно
+              прекращай проверки и публикуй то, что уже подтверждено.
+              Частичное ревью лучше, чем никакого
+
           claude_args: |
             --model ${{ env.REVIEW_MODEL }}
             --max-turns ${{ env.REVIEW_MAX_TURNS }}
-            --allowedTools "Task,Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git diff:*),mcp__github_inline_comment__create_inline_comment"
+            --allowedTools "Task,Read,Grep,Glob,Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(ls:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git diff:*),mcp__github_comment__update_claude_comment,mcp__github_inline_comment__create_inline_comment"
 
       - name: Save review checkpoint
         if: steps.diff.outputs.skip == '0' && success()
@@ -355,7 +379,7 @@ jobs:
               echo "Tracking-комментарий $CID обновлён"
               exit 0
             fi
-            echo "Не удалось отредактировать комментарий $CID, оставлен новый"
+            echo "Не удалось отредактировать комментарий $CID, оставляю новый"
           fi
 
           jq -n --arg b "$NOTE" '{body:$b}' \
