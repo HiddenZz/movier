@@ -31,15 +31,16 @@ jobs:
     timeout-minutes: 30
 
     env:
+    
       TAG_MODEL: ${{ vars.TAG_MODEL || 'claude-opus-5' }}
       TAG_MAX_TURNS: ${{ vars.TAG_MAX_TURNS || '40' }}
 
     permissions:
       contents: write       
-      pull-requests: write   
-      issues: write          
+      pull-requests: write  
+      issues: write         
       id-token: write
-      actions: read          
+      actions: read         
 
     steps:
       - name: Checkout repository
@@ -57,9 +58,11 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Install dependencies
-        if: steps.flutter.outcome == 'success'
-        run: flutter pub get
+      - name: Ensure clean working tree
+        run: |
+          git restore --worktree --staged -- . 2>/dev/null || git checkout -- . || true
+          echo "Незакоммиченные изменения перед запуском Claude:"
+          git status --porcelain || true
 
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
@@ -104,4 +107,38 @@ jobs:
             --model ${{ env.TAG_MODEL }}
             --max-turns ${{ env.TAG_MAX_TURNS }}
             --allowedTools "Edit,MultiEdit,Write,Task,Bash(flutter analyze:*),Bash(flutter test:*),Bash(flutter pub:*),Bash(dart format:*),Bash(dart fix:*),Bash(dart run build_runner:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue view:*),Bash(gh run view:*),Bash(gh run list:*),Bash(gh api:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git diff:*)"
-            --append-system-prompt "Проект - мобильное приложение на Flutter (iOS + Android) с собственным нативным кодом на Kotlin и Swift. Отвечай и комментируй по-русски. Прежде чем отвечать, прочитай обсуждение целиком: тред PR, inline-комментарии ревьюеров и то, что уже было решено - не предлагай повторно то, что команда уже отклонила. Никогда не редактируй генерируемые файлы (.g.dart, .freezed.dart, .gr.dart, .config.dart, локализации, firebase_options.dart) - меняй исходник и запускай build_runner. В треде PR есть служебный комментарий с маркером claude-review-state - не редактируй и не удаляй его, это чекпоинт авто-ревью. Если меняешь MethodChannel или EventChannel - правь обе стороны сразу, Dart и натив, и сверяй имя канала, имена методов, ключи и типы аргументов. Раннер - Linux: flutter analyze, dart format и flutter test доступны, собрать iOS или запустить симулятор нельзя, не пытайся. После правки Dart-кода запусти flutter analyze и dart format на затронутых файлах; нативный код проверить сборкой не получится, поэтому будь осторожнее и описывай риск в комментарии. Не добавляй зависимости в pubspec.yaml без явной просьбы. Если тебя просят провести код-ревью изменений - не делай его в одиночку, запусти субагента bug-hunter и опирайся на его находки, а для полного прогона предложи повесить на PR метку claude-review. Если задача сформулирована неоднозначно - задай уточняющий вопрос в комментарии вместо того, чтобы угадывать. Если правка большая или ты не уверен - опиши план вместо того, чтобы коммитить."
+            --append-system-prompt "Проект - мобильное приложение на Flutter (iOS + Android) с собственным нативным кодом на Kotlin и Swift. Отвечай и комментируй по-русски. Правила проекта в CLAUDE.md имеют приоритет над твоими привычками; прочитай корневой CLAUDE.md и CLAUDE.md рядом с файлами, которые правишь. Прежде чем отвечать, прочитай обсуждение целиком: тред PR, inline-комментарии ревьюеров и то, что уже было решено - не предлагай повторно то, что команда уже отклонила. Никогда не редактируй генерируемые файлы (.g.dart, .freezed.dart, .gr.dart, .config.dart, локализации, firebase_options.dart) - меняй исходник и запускай build_runner. В треде PR есть служебный комментарий с маркером claude-review-state - не редактируй и не удаляй его, это чекпоинт авто-ревью. Если меняешь MethodChannel или EventChannel - правь обе стороны сразу, Dart и натив, и сверяй имя канала, имена методов, ключи и типы аргументов. Раннер - Linux: flutter analyze, dart format и flutter test доступны, собрать iOS или запустить симулятор нельзя, не пытайся. SDK установлен, но зависимости нет - перед первым analyze или test выполни flutter pub get. Не коммить pubspec.lock, .dart_tool, .flutter-plugins и прочие артефакты pub get, если тебя об этом не просили. После правки Dart-кода запусти flutter analyze и dart format на затронутых файлах; нативный код проверить сборкой не получится, поэтому будь осторожнее и описывай риск в комментарии. Не добавляй зависимости в pubspec.yaml без явной просьбы. Если тебя просят провести код-ревью изменений - не делай его в одиночку, запусти субагента bug-hunter и опирайся на его находки, а для полного прогона предложи повесить на PR метку claude-review. Если задача сформулирована неоднозначно - задай уточняющий вопрос в комментарии вместо того, чтобы угадывать. Если правка большая или ты не уверен - опиши план вместо того, чтобы коммитить."
+
+      - name: Report failure in tracking comment
+        if: failure()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number || github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+
+          NOTE="❌ Прогон Claude завершился с ошибкой и задача не выполнена. [Логи workflow](${RUN_URL})"
+
+          # Ищем последний комментарий от бота, похожий на tracking-комментарий
+          CID=$(gh api "repos/$REPO/issues/$ISSUE/comments" --paginate \
+            --jq '[.[]
+                   | select(.user.type == "Bot")
+                   | select(.body | test("Claude Code is working|Claude finished|working…|working\\.\\.\\."))
+                   | .id] | last // empty' 2>/dev/null || true)
+
+          if [ -n "$CID" ]; then
+            OLD=$(gh api "repos/$REPO/issues/comments/$CID" --jq .body 2>/dev/null || echo "")
+            NEW=$(printf '%s\n\n---\n\n%s\n' "$OLD" "$NOTE")
+            if jq -n --arg b "$NEW" '{body:$b}' \
+              | gh api -X PATCH "repos/$REPO/issues/comments/$CID" --input - --silent 2>/dev/null; then
+              echo "Tracking-комментарий $CID обновлён"
+              exit 0
+            fi
+            echo "Не удалось отредактировать комментарий $CID, оставляю новый"
+          fi
+
+          jq -n --arg b "$NOTE" '{body:$b}' \
+            | gh api -X POST "repos/$REPO/issues/$ISSUE/comments" --input - --silent

@@ -40,13 +40,20 @@ jobs:
       !contains(github.event.pull_request.title, '[skip review]') &&
       (
         (github.event.action == 'labeled' && github.event.label.name == 'claude-review') ||
-        (github.event.action != 'labeled' && github.event.pull_request.draft == false)
+        (
+          github.event.action != 'labeled' &&
+          github.event.pull_request.draft == false &&
+          vars.AUTO_REVIEW_ENABLED != 'false' &&
+          vars.AUTO_REVIEW_ENABLED != 'off'
+        )
       )
 
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     env:
+      # Выключатель авто-ревью. 'false' или 'off'
+      AUTO_REVIEW_ENABLED: ${{ vars.AUTO_REVIEW_ENABLED || 'true' }}
       # Потолок размера ревьюируемого диффа.
       MAX_DIFF_LINES: ${{ vars.MAX_DIFF_LINES || '3000' }}
       REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'claude-sonnet-5' }}
@@ -84,6 +91,8 @@ jobs:
           if [ "$MANUAL" = "true" ]; then
             echo "Ручной запуск по метке '$REVIEW_LABEL' — лимит размера снят"
             MAX_DIFF_LINES=0
+          else
+            echo "Авто-запуск (AUTO_REVIEW_ENABLED=$AUTO_REVIEW_ENABLED)"
           fi
 
           
@@ -175,6 +184,7 @@ jobs:
           Разбейте PR на части или запустите ревью вручную комментарием \`@claude отревьюй этот PR\`."
 
       - name: Run Claude Code Review
+        id: claude
         if: steps.diff.outputs.skip == '0'
         uses: anthropics/claude-code-action@v1
         with:
@@ -314,6 +324,42 @@ jobs:
           else
             gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$BODY" --silent
           fi
+
+      - name: Report failure in tracking comment
+        if: always() && steps.claude.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+
+          NOTE="❌ Авто-ревью завершилось с ошибкой, находки не опубликованы. [Логи workflow](${RUN_URL})
+          Перезапустить можно меткой \`${REVIEW_LABEL}\`."
+
+          # jq (--arg и т.п.), поэтому маркер подставляет shell.
+          CID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq "[.[]
+                   | select(.user.type == \"Bot\")
+                   | select(.body | contains(\"$STATE_MARKER\") | not)
+                   | select(.body | test(\"Claude Code is working|Claude finished|working…|working[.][.][.]\"))
+                   | .id] | last // empty" 2>/dev/null | tail -n1 || true)
+
+          if [ -n "$CID" ]; then
+            OLD=$(gh api "repos/$REPO/issues/comments/$CID" --jq .body 2>/dev/null || echo "")
+            NEW=$(printf '%s\n\n---\n\n%s\n' "$OLD" "$NOTE")
+            if jq -n --arg b "$NEW" '{body:$b}' \
+              | gh api -X PATCH "repos/$REPO/issues/comments/$CID" --input - --silent 2>/dev/null; then
+              echo "Tracking-комментарий $CID обновлён"
+              exit 0
+            fi
+            echo "Не удалось отредактировать комментарий $CID, оставлен новый"
+          fi
+
+          jq -n --arg b "$NOTE" '{body:$b}' \
+            | gh api -X POST "repos/$REPO/issues/$PR/comments" --input - --silent
 
       - name: Remove trigger label
         if: always() && github.event.action == 'labeled'
