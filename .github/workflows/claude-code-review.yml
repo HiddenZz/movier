@@ -40,13 +40,20 @@ jobs:
       !contains(github.event.pull_request.title, '[skip review]') &&
       (
         (github.event.action == 'labeled' && github.event.label.name == 'claude-review') ||
-        (github.event.action != 'labeled' && github.event.pull_request.draft == false)
+        (
+          github.event.action != 'labeled' &&
+          github.event.pull_request.draft == false &&
+          vars.AUTO_REVIEW_ENABLED != 'false' &&
+          vars.AUTO_REVIEW_ENABLED != 'off'
+        )
       )
 
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     env:
+      # Выключатель авто-ревью. 'false' или 'off'
+      AUTO_REVIEW_ENABLED: ${{ vars.AUTO_REVIEW_ENABLED || 'true' }}
       # Потолок размера ревьюируемого диффа.
       MAX_DIFF_LINES: ${{ vars.MAX_DIFF_LINES || '3000' }}
       REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'claude-sonnet-5' }}
@@ -84,6 +91,8 @@ jobs:
           if [ "$MANUAL" = "true" ]; then
             echo "Ручной запуск по метке '$REVIEW_LABEL' — лимит размера снят"
             MAX_DIFF_LINES=0
+          else
+            echo "Авто-запуск (AUTO_REVIEW_ENABLED=$AUTO_REVIEW_ENABLED)"
           fi
 
           
