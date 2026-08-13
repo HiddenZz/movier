@@ -2,7 +2,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       # Dart
       - "lib/**"
@@ -36,20 +36,25 @@ concurrency:
 jobs:
   review:
     if: >-
-      github.event.pull_request.draft == false &&
       github.event.pull_request.user.type != 'Bot' &&
-      !contains(github.event.pull_request.title, '[skip review]')
+      !contains(github.event.pull_request.title, '[skip review]') &&
+      (
+        (github.event.action == 'labeled' && github.event.label.name == 'claude-review') ||
+        (github.event.action != 'labeled' && github.event.pull_request.draft == false)
+      )
 
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     env:
-      # Потолок размера ревьюируемого диффа
-      MAX_DIFF_LINES: ${{ vars.MAX_DIFF_LINES || '2500' }}
+      # Потолок размера ревьюируемого диффа.
+      MAX_DIFF_LINES: ${{ vars.MAX_DIFF_LINES || '3000' }}
       REVIEW_MODEL: ${{ vars.REVIEW_MODEL || 'claude-sonnet-5' }}
       REVIEW_MAX_TURNS: ${{ vars.REVIEW_MAX_TURNS || '40' }}
-      # Маркер служебного комментария с последним отревьюенным SHA
+      # Маркер комментария с последним отревьюенным SHA
       STATE_MARKER: "claude-review-state"
+      REVIEW_LABEL: "claude-review"
+      MANUAL: ${{ github.event.action == 'labeled' }}
 
     permissions:
       contents: read
@@ -63,7 +68,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-
       - name: Build review diff
         id: diff
         env:
@@ -74,12 +78,15 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          MAX_DIFF_LINES="${MAX_DIFF_LINES:-3000}"
 
-          # Дефолт на случай, если переменная не задана или пустая.
-          # MAX_DIFF_LINES=0 полностью отключает лимит.
-          MAX_DIFF_LINES="${MAX_DIFF_LINES:-2500}"
+          # Ручной запуск по метке
+          if [ "$MANUAL" = "true" ]; then
+            echo "Ручной запуск по метке '$REVIEW_LABEL' — лимит размера снят"
+            MAX_DIFF_LINES=0
+          fi
 
-          # --- ищем чекпоинт прошлого ревью -------------------------
+          
           LAST_SHA=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
             --jq "[.[] | select(.body | contains(\"$STATE_MARKER:\")) | .body] | last // empty" \
             | sed -n "s/.*$STATE_MARKER:\([0-9a-f]\{40\}\).*/\1/p" | head -n1 || true)
@@ -93,12 +100,9 @@ jobs:
             MODE="incremental"
             FROM="$LAST_SHA"
           fi
-          # force-push / rebase → LAST_SHA больше не предок head,
-          # объекта может не быть локально → честно падаем в full.
 
           echo "Режим ревью: $MODE (от ${FROM:0:8} до ${HEAD_SHA:0:8})"
 
-          # --- строим дифф ------------------------------------------
           EXCLUDES=(
             ':(exclude)*.g.dart'
             ':(exclude)*.freezed.dart'
@@ -129,9 +133,7 @@ jobs:
 
           TOTAL=$(wc -l < pr.diff)
 
-          # --- детерминированный триаж ------------------------------
-          # Считаем только осмысленные изменённые строки: выкидываем
-          # заголовки диффа, пустые строки и строки-комментарии.
+          # Подсчет только осмысленных измененных строк
           CODE_LINES=$(grep -E '^[+-]' pr.diff \
             | grep -Ev '^(\+\+\+|---)' \
             | sed -E 's/^[+-][[:space:]]*//' \
@@ -290,7 +292,6 @@ jobs:
             --max-turns ${{ env.REVIEW_MAX_TURNS }}
             --allowedTools "Task,Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh pr comment:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git diff:*),mcp__github_inline_comment__create_inline_comment"
 
-    
       - name: Save review checkpoint
         if: steps.diff.outputs.skip == '0' && success()
         env:
@@ -313,3 +314,13 @@ jobs:
           else
             gh api -X POST "repos/$REPO/issues/$PR/comments" -f body="$BODY" --silent
           fi
+
+      - name: Remove trigger label
+        if: always() && github.event.action == 'labeled'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X DELETE \
+            "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/$REVIEW_LABEL" \
+            --silent
