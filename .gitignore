@@ -1,48 +1,73 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
+# ─── Общее ───────────────────────────────────────────────────────────────
 .DS_Store
-.atom/
-.build/
-.buildlog/
+*.log
+*.swp
 .history
-.svn/
-.swiftpm/
-migrate_working_dir/
 
-# idea
+# Env / секреты
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
-.vscode/
+out/
 
-# Flutter/Dart/Pub related
+# Инструменты
+.serena/
+.claude/settings.local.json
+
+# ─── Flutter / Dart (apps/mobile) ────────────────────────────────────────
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
 **/doc/api/
 **/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
+migrate_working_dir/
+*.class
+*.pyc
 
-# Symbolication related
+# Артефакты сборки Android-части Flutter
+apps/mobile/android/app/debug/
+apps/mobile/android/app/profile/
+apps/mobile/android/app/release/
+
+# Symbolication / obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# ─── Gradle / Java (apps/parser, apps/downloader) ────────────────────────
+**/.gradle/
+.kotlin/
+**/build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+!gradle/wrapper/gradle-wrapper.jar
 
+# Eclipse / NetBeans
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
 
-# Env
-.env
-
-#Meta
-.serena
+# ─── Локальные данные стека (deploy) ─────────────────────────────────────
+deploy/data/
+deploy/jackett/
+deploy/downloads/
