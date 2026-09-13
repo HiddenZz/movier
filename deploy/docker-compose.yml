@@ -1,0 +1,106 @@
+# Инфраструктура стека movier: одна команда поднимает всё, от чего зависят
+# apps/stream и apps/downloader при локальной разработке.
+#
+# Сами приложения запускаются из IDE или через ./gradlew :stream:bootRun /
+# :downloader:bootRun — их application.yml смотрит на localhost, порты ниже.
+#
+# Consumer-группы Redis Streams здесь не создаются: stream заводит свою
+# в ResultStreamConfiguration, downloader — в StreamSetup.
+
+name: movier
+
+services:
+  postgres:
+    image: postgres:17.3
+    container_name: movier_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: movie_user
+      POSTGRES_PASSWORD: movie
+      POSTGRES_DB: movie
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U movie_user -d movie"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [movier]
+
+  redis:
+    image: redis:7-alpine
+    container_name: movier_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [movier]
+
+  minio:
+    image: minio/minio:latest
+    container_name: movier_minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"   # S3 API — storage.minio.credentials.endpoint
+      - "9001:9001"   # веб-консоль
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [movier]
+
+  # Бакет, в который downloader пишет HLS, а stream его оттуда отдаёт
+  # (storage.minio.buckets.top-prefix / storage.s3.top-prefix: content).
+  minio-init:
+    image: minio/mc:latest
+    container_name: movier_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin123 &&
+      mc mb --ignore-existing local/content &&
+      echo 'bucket content ready'
+      "
+    networks: [movier]
+
+  jackett:
+    image: lscr.io/linuxserver/jackett:latest
+    container_name: movier_jackett
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Moscow
+    ports:
+      - "9117:9117"
+    volumes:
+      - ./jackett/config:/config
+      - ./downloads:/downloads
+    networks: [movier]
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+networks:
+  movier:
+    driver: bridge

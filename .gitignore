@@ -42,7 +42,7 @@ apps/mobile/android/app/release/
 app.*.symbols
 app.*.map.json
 
-# ─── Gradle / Java (apps/parser, apps/downloader) ────────────────────────
+# ─── Gradle / Java (apps/stream, apps/downloader) ────────────────────────
 **/.gradle/
 .kotlin/
 **/build/
@@ -71,3 +71,6 @@ bin/
 deploy/data/
 deploy/jackett/
 deploy/downloads/
+deploy/miniosolo/
+deploy/local.env
+deploy/docker-compose.override.yml

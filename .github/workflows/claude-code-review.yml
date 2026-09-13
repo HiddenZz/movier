@@ -5,13 +5,18 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths:
       # Dart
-      - "lib/**"
-      - "test/**"
-      - "pubspec.yaml"
-      # Нативн
-      - "android/**"
-      - "ios/**"
-      - "packages/**"
+      - "apps/mobile/lib/**"
+      - "apps/mobile/test/**"
+      - "apps/mobile/pubspec.yaml"
+      # Нативная часть мобильного клиента
+      - "apps/mobile/android/**"
+      - "apps/mobile/ios/**"
+      - "apps/mobile/packages/**"
+      # Бэкенд (Java, Spring Boot)
+      - "apps/stream/src/**"
+      - "apps/downloader/src/**"
+      - "**/build.gradle"
+      - "settings.gradle"
       # Генерируемое
       - "!**/*.g.dart"
       - "!**/*.freezed.dart"
@@ -22,8 +27,8 @@ on:
       - "!**/app_localizations*.dart"
       - "!**/firebase_options.dart"
       - "!**/generated_plugin_registrant.dart"
-      - "!ios/Pods/**"
-      - "!ios/Flutter/Generated.xcconfig"
+      - "!apps/mobile/ios/Pods/**"
+      - "!apps/mobile/ios/Flutter/Generated.xcconfig"
       - "!**/build/**"
       - "!**/*.pbxproj"
       - "!**/xcuserdata/**"
@@ -125,8 +130,8 @@ jobs:
             ':(exclude)*app_localizations*.dart'
             ':(exclude)*firebase_options.dart'
             ':(exclude)*generated_plugin_registrant.dart'
-            ':(exclude)ios/Pods/*'
-            ':(exclude)ios/Flutter/Generated.xcconfig'
+            ':(exclude)apps/mobile/ios/Pods/*'
+            ':(exclude)apps/mobile/ios/Flutter/Generated.xcconfig'
             ':(exclude)*/build/*'
             ':(exclude)*.pbxproj'
             ':(exclude)*xcuserdata/*'
@@ -210,7 +215,7 @@ jobs:
                   "Read(**/app_localizations*.dart)",
                   "Read(**/firebase_options.dart)",
                   "Read(**/generated_plugin_registrant.dart)",
-                  "Read(ios/Pods/**)",
+                  "Read(apps/mobile/ios/Pods/**)",
                   "Read(**/build/**)",
 
                   "Edit",
@@ -246,8 +251,10 @@ jobs:
             РЕЖИМ РЕВЬЮ: ${{ steps.diff.outputs.mode }}
             ДИАПАЗОН: ${{ steps.diff.outputs.from }} .. ${{ github.event.pull_request.head.sha }}
 
-            Ты оркестрируешь код-ревью пул-реквеста мобильного приложения
-            на Flutter (iOS + Android). Выполняй шаги строго по порядку.
+            Ты оркестрируешь код-ревью пул-реквеста в монорепозитории:
+            `apps/mobile` — клиент на Flutter (iOS + Android),
+            `apps/stream` и `apps/downloader` — бэкенд на Java/Spring Boot.
+            Выполняй шаги строго по порядку.
 
             ТЫ ТОЛЬКО РЕВЬЮИШЬ. Это перекрывает всё, что написано
             в шаблоне выше про внесение правок.

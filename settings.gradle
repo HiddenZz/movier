@@ -1,0 +1,11 @@
+rootProject.name = 'movier'
+
+// Бэкенд-модули лежат в apps/, но подключаются как проекты верхнего уровня,
+// чтобы не появлялся пустой промежуточный проект ':apps'.
+include 'stream'
+include 'downloader'
+
+project(':stream').projectDir = file('apps/stream')
+project(':downloader').projectDir = file('apps/downloader')
+
+// apps/mobile (Flutter) собирается собственным тулчейном и сюда намеренно не включён.

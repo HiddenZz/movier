@@ -21,8 +21,8 @@ tmdb:
 
 torrent:
   jackett:
-    url: http://localhost:9117/api/v2.0/
-    apiKey: d20mpf01xc8p2j0o2feizx4w5p5p763r
+    url: ${JACKETT_URL:http://localhost:9117/api/v2.0/}
+    apiKey: ${JACKETT_API_KEY}
 
 
 server:

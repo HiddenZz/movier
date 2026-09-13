@@ -85,9 +85,9 @@ jobs:
                   "Read(**/app_localizations*.dart)",
                   "Read(**/firebase_options.dart)",
                   "Read(**/generated_plugin_registrant.dart)",
-                  "Read(ios/Pods/**)",
+                  "Read(apps/mobile/ios/Pods/**)",
                   "Read(**/build/**)",
-                  "Read(./.env)",
+                  "Read(**/.env)",
                   "Read(**/*.jks)",
                   "Read(**/*.keystore)",
                   "Read(**/GoogleService-Info.plist)",
@@ -96,7 +96,7 @@ jobs:
                   "Write(**/*.gr.dart)",
                   "Write(**/*.config.dart)",
                   "Write(**/generated/**)",
-                  "Write(ios/Pods/**)",
+                  "Write(apps/mobile/ios/Pods/**)",
                   "Write(**/*.pbxproj)",
                   "Bash(git push --force:*)"
                 ]
@@ -107,7 +107,7 @@ jobs:
             --model ${{ env.TAG_MODEL }}
             --max-turns ${{ env.TAG_MAX_TURNS }}
             --allowedTools "Edit,MultiEdit,Write,Task,Bash(flutter analyze:*),Bash(flutter test:*),Bash(flutter pub:*),Bash(dart format:*),Bash(dart fix:*),Bash(dart run build_runner:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue view:*),Bash(gh run view:*),Bash(gh run list:*),Bash(gh api:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(git diff:*)"
-            --append-system-prompt "Проект - мобильное приложение на Flutter (iOS + Android) с собственным нативным кодом на Kotlin и Swift. Отвечай и комментируй по-русски. Правила проекта в CLAUDE.md имеют приоритет над твоими привычками; прочитай корневой CLAUDE.md и CLAUDE.md рядом с файлами, которые правишь. Прежде чем отвечать, прочитай обсуждение целиком: тред PR, inline-комментарии ревьюеров и то, что уже было решено - не предлагай повторно то, что команда уже отклонила. Никогда не редактируй генерируемые файлы (.g.dart, .freezed.dart, .gr.dart, .config.dart, локализации, firebase_options.dart) - меняй исходник и запускай build_runner. В треде PR есть служебный комментарий с маркером claude-review-state - не редактируй и не удаляй его, это чекпоинт авто-ревью. Если меняешь MethodChannel или EventChannel - правь обе стороны сразу, Dart и натив, и сверяй имя канала, имена методов, ключи и типы аргументов. Раннер - Linux: flutter analyze, dart format и flutter test доступны, собрать iOS или запустить симулятор нельзя, не пытайся. SDK установлен, но зависимости нет - перед первым analyze или test выполни flutter pub get. Не коммить pubspec.lock, .dart_tool, .flutter-plugins и прочие артефакты pub get, если тебя об этом не просили. После правки Dart-кода запусти flutter analyze и dart format на затронутых файлах; нативный код проверить сборкой не получится, поэтому будь осторожнее и описывай риск в комментарии. Не добавляй зависимости в pubspec.yaml без явной просьбы. Если тебя просят провести код-ревью изменений - не делай его в одиночку, запусти субагента bug-hunter и опирайся на его находки, а для полного прогона предложи повесить на PR метку claude-review. Если задача сформулирована неоднозначно - задай уточняющий вопрос в комментарии вместо того, чтобы угадывать. Если правка большая или ты не уверен - опиши план вместо того, чтобы коммитить."
+            --append-system-prompt "Проект - монорепозиторий: apps/mobile - клиент на Flutter (iOS + Android) с нативным кодом на Kotlin и Swift, apps/stream (API клиента, TMDB и Jackett) и apps/downloader (торрент, FFmpeg, HLS) - бэкенд на Java/Spring Boot, один Gradle-проект с корневым build.gradle и wrapper, deploy - docker-compose с инфраструктурой стека. Отвечай и комментируй по-русски. Правила проекта в CLAUDE.md имеют приоритет над твоими привычками; прочитай корневой CLAUDE.md и CLAUDE.md рядом с файлами, которые правишь. Прежде чем отвечать, прочитай обсуждение целиком: тред PR, inline-комментарии ревьюеров и то, что уже было решено - не предлагай повторно то, что команда уже отклонила. Никогда не редактируй генерируемые файлы (.g.dart, .freezed.dart, .gr.dart, .config.dart, локализации, firebase_options.dart) - меняй исходник и запускай build_runner. В треде PR есть служебный комментарий с маркером claude-review-state - не редактируй и не удаляй его, это чекпоинт авто-ревью. Если меняешь MethodChannel или EventChannel - правь обе стороны сразу, Dart и натив, и сверяй имя канала, имена методов, ключи и типы аргументов. Раннер - Linux: flutter analyze, dart format и flutter test доступны, собрать iOS или запустить симулятор нельзя, не пытайся. Flutter-команды запускай из apps/mobile - в корне репозитория pubspec.yaml нет. SDK установлен, но зависимости нет - перед первым analyze или test выполни flutter pub get. JDK и Gradle на раннере не настроены: бэкенд в apps/stream и apps/downloader проверяй чтением кода, ./gradlew не запускай. Не коммить pubspec.lock, .dart_tool, .flutter-plugins и прочие артефакты pub get, если тебя об этом не просили. После правки Dart-кода запусти flutter analyze и dart format на затронутых файлах; нативный код проверить сборкой не получится, поэтому будь осторожнее и описывай риск в комментарии. Не добавляй зависимости в pubspec.yaml без явной просьбы. Если тебя просят провести код-ревью изменений - не делай его в одиночку, запусти субагента bug-hunter и опирайся на его находки, а для полного прогона предложи повесить на PR метку claude-review. Если задача сформулирована неоднозначно - задай уточняющий вопрос в комментарии вместо того, чтобы угадывать. Если правка большая или ты не уверен - опиши план вместо того, чтобы коммитить."
 
       - name: Report failure in tracking comment
         if: failure()
