@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="org.downloader.feature.progress.repository.mapper.ContentMapper">
+
+    <select id="isExists" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM content_state WHERE content_uuid = #{contentUuid})
+    </select>
+
+    <select id="insert" resultType="_long">
+        INSERT INTO content_state(content_uuid, tmdb_id, state)
+        VALUES (#{dto.contentUuid}, #{dto.tmdbId}, #{dto.state}) RETURNING id
+    </select>
+
+    <update id="updateState">
+        UPDATE content_state
+        SET state       = #{dto.state},
+            error_cause = #{dto.errorCause},
+            updated_at  = NOW()
+        WHERE content_uuid = #{dto.contentUuid}
+    </update>
+
+</mapper>

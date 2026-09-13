@@ -1,0 +1,36 @@
+package org.downloader.feature.progress.service;
+
+import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.downloader.feature.progress.model.Progress;
+import org.downloader.feature.progress.model.ProgressType;
+import org.downloader.feature.progress.repository.ProgressRepository;
+import org.springframework.stereotype.Service;
+
+@AllArgsConstructor
+@Service
+@Slf4j
+public class DownloadingProgressReporter implements ProgressReporter {
+
+    private final ProgressRepository redisRepository;
+
+    @Override
+    public void set(Progress progress) {
+        try {
+            redisRepository.set(progress, ProgressType.DOWNLOADING);
+        } catch (Exception e) {
+            log.error("Error during publish download progress for content Uuid:%s, tmdbId:%s".formatted(progress.contentUuid(), progress.tmdbId()), e);
+        }
+    }
+
+    @Override
+    public void invalidate(long tmdbId, String contentUuid, String quality) {
+        try {
+            redisRepository.invalidate(ProgressType.DOWNLOADING, tmdbId, contentUuid, quality);
+        } catch (Exception e) {
+            log.error("Error during invalidate downloading progress cache for Uuid:%s, tmdbId:%s".formatted(contentUuid, tmdbId), e);
+        }
+    }
+
+
+}
