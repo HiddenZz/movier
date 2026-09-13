@@ -1,0 +1,66 @@
+storage:
+  minio:
+    credentials:
+      endpoint: http://127.0.0.1:9000/
+      name: "minioadmin"
+      password: "minioadmin123"
+    buckets:
+      top-prefix: content
+  redis:
+    torrent-cache-per-seconds: 7200
+    negative-cache-seconds: 900
+    download-stream: download:stream
+    result-stream: result:stream
+    stream-message-head-key: data
+
+
+tmdb:
+  base-url: https://api.themoviedb.org/3
+  api-token: ${TMDB_API_TOKEN}
+  image-base-url: https://image.tmdb.org/t/p/w500
+
+torrent:
+  jackett:
+    url: http://localhost:9117/api/v2.0/
+    apiKey: d20mpf01xc8p2j0o2feizx4w5p5p763r
+
+
+server:
+  port: 8084
+
+
+app:
+  public-base-url: ${PUBLIC_BASE_URL:http://10.0.2.2:8084}
+
+
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: film_stream
+    default-schema: film_stream
+  datasource:
+    url: jdbc:postgresql://localhost:5432/movie?currentSchema=film_stream
+    username: movie_user
+    password: movie
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+
+# MyBatis Configuration
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+
+logging:
+  level:
+    org.apache.ibatis: DEBUG
+    org.film.parser.feature.movie.detail.repository: TRACE
+    org.springframework.jdbc.core.JdbcTemplate: DEBUG
+    org.springframework.jdbc.core.StatementCreatorUtils: TRACE
+    org.springframework.web.client.RestTemplate: DEBUG
+    org.apache.http: DEBUG
+    httpclient.wire: DEBUG
+    org.film.parser: DEBUG

@@ -1,0 +1,75 @@
+package org.film.parser.core.configuration;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+
+import javax.net.ssl.*;
+import java.net.CookieManager;
+import java.net.InetSocketAddress;
+import java.net.ProxySelector;
+import java.net.http.HttpClient;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
+import java.time.Duration;
+
+
+@Configuration
+public class RestClientConfiguration {
+
+    @Bean
+    RestClient restClient() {
+        HttpClient jdkHttpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+
+        return RestClient.builder()
+                .requestFactory(new JdkClientHttpRequestFactory(jdkHttpClient))
+
+                .build();
+    }
+
+
+    @Bean
+    RestClient proxyRestClient() throws NoSuchAlgorithmException, KeyManagementException {
+        TrustManager[] trustAllCerts = new TrustManager[]{
+                new X509TrustManager() {
+                    public X509Certificate[] getAcceptedIssuers() {
+                        return null;
+                    }
+
+                    public void checkClientTrusted(X509Certificate[] certs, String authType) {
+                    }
+
+                    public void checkServerTrusted(X509Certificate[] certs, String authType) {
+                    }
+                }
+        };
+
+        SSLContext sc = SSLContext.getInstance("SSL");
+        sc.init(null, trustAllCerts, new java.security.SecureRandom());
+
+        HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+        HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
+
+        SSLParameters sslParameters = new SSLParameters();
+        sslParameters.setEndpointIdentificationAlgorithm(null);
+
+        HttpClient jdkHttpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(5))
+                .cookieHandler(new CookieManager())
+                .sslContext(sc)
+                .sslParameters(sslParameters)
+                .proxy(ProxySelector.of(new InetSocketAddress("127.0.0.1", 8080)))
+                .build();
+
+        return RestClient.builder()
+                .requestFactory(new JdkClientHttpRequestFactory(jdkHttpClient))
+                .build();
+    }
+
+}
