@@ -58,4 +58,11 @@ subprojects {
     test {
         useJUnitPlatform()
     }
+
+    // IntelliJ при синхронизации Gradle запрашивает prepareKotlinBuildScriptModel
+    // у каждого проекта, а Gradle регистрирует её только в корневом. Без этой
+    // заглушки импорт монорепо в IDEA падает с "task not found in project".
+    if (!tasks.names.contains('prepareKotlinBuildScriptModel')) {
+        tasks.register('prepareKotlinBuildScriptModel')
+    }
 }
