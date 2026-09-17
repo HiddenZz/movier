@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:control/control.dart';
 import 'package:dio/dio.dart';
 import 'package:l/l.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:movier/common/env/env.dart';
 import 'package:movier/common/model/dependencies.dart';
 import 'package:movier/common/observers/controller_observer.dart';
@@ -35,11 +36,19 @@ typedef _InitializationStep = FutureOr<void> Function(_MutableDependencies depen
 
 final Map<String, _InitializationStep> _initializationSteps = <String, _InitializationStep>{
   "http client init": (deps) {
-    final options = BaseOptions(baseUrl: Env.baseUrl);
+    final options = BaseOptions(
+      baseUrl: Env.baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      sendTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 20),
+    );
 
     deps.dio = Dio(options);
   },
   "Controller Observer": (_) {
     Controller.observer = DefaultControllerObserver(logger: l);
+  },
+  "media kit init": (_) {
+    MediaKit.ensureInitialized();
   },
 };

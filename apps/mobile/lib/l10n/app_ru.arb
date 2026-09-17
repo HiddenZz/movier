@@ -1,0 +1,18 @@
+{
+  "@@locale": "ru",
+
+  "playerQuality": "Качество",
+  "playerQualityAuto": "Авто",
+  "playerSpeed": "Скорость",
+  "playerSpeedValue": "{rate}×",
+  "playerRetry": "Повторить",
+
+  "errorConnection": "Нет соединения с сервером.",
+  "errorTimeout": "Сервер слишком долго не отвечает.",
+  "errorNotFound": "Контент не найден.",
+  "errorServer": "Ошибка сервера ({status}).",
+  "errorBadResponse": "Сервер вернул неожиданный ответ.",
+  "errorMalformedPlaylist": "Манифест потока повреждён.",
+  "errorPlayback": "Не удалось воспроизвести.",
+  "errorUnknown": "Что-то пошло не так."
+}

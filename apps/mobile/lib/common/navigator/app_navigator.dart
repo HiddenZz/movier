@@ -40,6 +40,20 @@ class AppNavigator extends StatefulWidget {
   /// that encloses the given context, if any.
   static AppNavigatorState? maybeOf(BuildContext context) => context.findAncestorStateOfType<AppNavigatorState>();
 
+  /// The outermost [AppNavigatorState] above the given context, if any.
+  ///
+  /// Nested navigators live inside the bottom navigation shell, so a page
+  /// pushed with [push] is covered by that shell. Pages that must own the
+  /// whole screen — a video player, for one — go through [pushRoot].
+  static AppNavigatorState? maybeRootOf(BuildContext context) {
+    AppNavigatorState? root;
+    context.visitAncestorElements((element) {
+      if (element case StatefulElement(state: final AppNavigatorState state)) root = state;
+      return true;
+    });
+    return root;
+  }
+
   /// The navigation state from the closest instance of this class
   /// that encloses the given context, if any.
   static AppNavigationState? stateOf(BuildContext context) => maybeOf(context)?.state;
@@ -54,6 +68,13 @@ class AppNavigator extends StatefulWidget {
 
   /// Add a page to the stack.
   static void push(BuildContext context, AppPage page) => change(context, (state) => [...state, page]);
+
+  /// Change the pages of the root navigator.
+  static void changeRoot(BuildContext context, AppNavigationState Function(AppNavigationState pages) fn) =>
+      maybeRootOf(context)?.change(fn);
+
+  /// Add a page to the root navigator stack, above the navigation shell.
+  static void pushRoot(BuildContext context, AppPage page) => changeRoot(context, (state) => [...state, page]);
 
   /// Pop the last page from the stack.
   static void pop(BuildContext context) => change(context, (state) {
