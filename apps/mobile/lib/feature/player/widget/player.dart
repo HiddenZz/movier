@@ -40,17 +40,21 @@ class _PlayerViewState extends State<PlayerView> {
   late final MediaController mediaController;
 
   bool _fullscreen = false;
-  bool _controlsVisible = true;
+
+  /// Controls overlay visibility, auto-hidden after [_controlsTimeout].
+  final ValueNotifier<bool> _controlsVisible = ValueNotifier(true);
   Timer? _controlsTimer;
 
   /// Set while a horizontal drag owns the position, so the seek bar follows
   /// the finger instead of the incoming position ticks.
   Duration? _scrubPosition;
 
-  ({PlayerSide side, int seconds})? _seekFeedback;
+  /// Double-tap seek hint, shown for [_feedbackDuration] after each seek.
+  final ValueNotifier<({PlayerSide side, int seconds})?> _seekFeedback = ValueNotifier(null);
   Timer? _seekFeedbackTimer;
 
-  ({IconData icon, double value})? _valueFeedback;
+  /// Brightness/volume hint, shown while a vertical drag is in progress.
+  final ValueNotifier<({IconData icon, double value})?> _valueFeedback = ValueNotifier(null);
   double _brightness = 0;
   double _volume = 100;
   bool _brightnessTouched = false;
@@ -72,9 +76,12 @@ class _PlayerViewState extends State<PlayerView> {
   void dispose() {
     _controlsTimer?.cancel();
     _seekFeedbackTimer?.cancel();
+    _controlsVisible.dispose();
+    _seekFeedback.dispose();
+    _valueFeedback.dispose();
     // Leaving straight from fullscreen must not strand the app in landscape.
-    if (_fullscreen) unawaited($exitPlayerFullscreen());
-    if (_brightnessTouched) unawaited(ScreenBrightness().resetApplicationScreenBrightness().catchError((_) {}));
+    if (_fullscreen) $exitPlayerFullscreen().ignore();
+    if (_brightnessTouched) ScreenBrightness().resetApplicationScreenBrightness().ignore();
 
     super.dispose();
   }
@@ -93,7 +100,7 @@ class _PlayerViewState extends State<PlayerView> {
             error: error,
             onRetry: () => mediaController.load(widget.contentUuid),
           ),
-          final state => Stack(
+          _ => Stack(
             fit: StackFit.expand,
             children: [
               Video(controller: mediaController.videoController, controls: null),
@@ -108,27 +115,35 @@ class _PlayerViewState extends State<PlayerView> {
                 onVerticalDragEnd: _onVerticalDragEnd,
                 child: const SizedBox.expand(),
               ),
-              ?switch (_seekFeedback) {
-                final feedback? => PlayerSeekFeedback(side: feedback.side, seconds: feedback.seconds),
-                _ => null,
-              },
-              ?switch (_valueFeedback) {
-                final feedback? => PlayerValueFeedback(icon: feedback.icon, value: feedback.value),
-                _ => null,
-              },
-              PlayerControls(
-                contentUuid: widget.contentUuid,
-                title: widget.title,
-                state: state,
-                player: _player,
-                visible: _controlsVisible,
-                fullscreen: _fullscreen,
-                scrubPosition: _scrubPosition,
-                scrubbing: _scrubPosition != null,
-                onInteraction: _restartControlsTimer,
-                onToggleFullscreen: _toggleFullscreen,
-                onClose: () => AppNavigator.pop(context),
-                onSeek: (position) => unawaited(_player.seek(_clamp(position))),
+              ValueListenableBuilder(
+                valueListenable: _seekFeedback,
+                builder: (context, feedback, _) => switch (feedback) {
+                  final value? => PlayerSeekFeedback(side: value.side, seconds: value.seconds),
+                  _ => const SizedBox.shrink(),
+                },
+              ),
+              ValueListenableBuilder(
+                valueListenable: _valueFeedback,
+                builder: (context, feedback, _) => switch (feedback) {
+                  final value? => PlayerValueFeedback(icon: value.icon, value: value.value),
+                  _ => const SizedBox.shrink(),
+                },
+              ),
+              ValueListenableBuilder(
+                valueListenable: _controlsVisible,
+                builder: (context, visible, _) => PlayerControls(
+                  contentUuid: widget.contentUuid,
+                  title: widget.title,
+                  player: _player,
+                  visible: visible,
+                  fullscreen: _fullscreen,
+                  scrubPosition: _scrubPosition,
+                  scrubbing: _scrubPosition != null,
+                  onInteraction: _restartControlsTimer,
+                  onToggleFullscreen: _toggleFullscreen,
+                  onClose: () => AppNavigator.pop(context),
+                  onSeek: (position) => unawaited(_player.seek(_clamp(position))),
+                ),
               ),
             ],
           ),
@@ -139,14 +154,13 @@ class _PlayerViewState extends State<PlayerView> {
 
   void _restartControlsTimer() {
     _controlsTimer?.cancel();
-    _controlsTimer = Timer(_controlsTimeout, () {
-      if (mounted) setState(() => _controlsVisible = false);
-    });
+    _controlsTimer = Timer(_controlsTimeout, () => _controlsVisible.value = false);
   }
 
   void _toggleControls() {
-    setState(() => _controlsVisible = !_controlsVisible);
-    if (_controlsVisible) _restartControlsTimer();
+    final visible = !_controlsVisible.value;
+    _controlsVisible.value = visible;
+    if (visible) _restartControlsTimer();
   }
 
   Duration _clamp(Duration position) => switch (position) {
@@ -170,19 +184,15 @@ class _PlayerViewState extends State<PlayerView> {
 
     unawaited(_player.seek(target));
 
-    setState(() => _seekFeedback = (side: side, seconds: offset.inSeconds));
+    _seekFeedback.value = (side: side, seconds: offset.inSeconds);
     _seekFeedbackTimer?.cancel();
-    _seekFeedbackTimer = Timer(_feedbackDuration, () {
-      if (mounted) setState(() => _seekFeedback = null);
-    });
+    _seekFeedbackTimer = Timer(_feedbackDuration, () => _seekFeedback.value = null);
   }
 
   void _onScrubStart() {
     _controlsTimer?.cancel();
-    setState(() {
-      _controlsVisible = true;
-      _scrubPosition = _player.state.position;
-    });
+    _controlsVisible.value = true;
+    setState(() => _scrubPosition = _player.state.position);
   }
 
   void _onScrubUpdate(double fraction) {
@@ -205,10 +215,10 @@ class _PlayerViewState extends State<PlayerView> {
       case PlayerSide.left:
         _brightness = await ScreenBrightness().application.catchError((_) => 0.0);
         if (!mounted) return;
-        setState(() => _valueFeedback = (icon: Icons.brightness_6_outlined, value: _brightness));
+        _valueFeedback.value = (icon: Icons.brightness_6_outlined, value: _brightness);
       case PlayerSide.right:
         _volume = _player.state.volume;
-        setState(() => _valueFeedback = (icon: Icons.volume_up_outlined, value: _volume / 100));
+        _valueFeedback.value = (icon: Icons.volume_up_outlined, value: _volume / 100);
     }
   }
 
@@ -218,15 +228,15 @@ class _PlayerViewState extends State<PlayerView> {
         _brightness = (_brightness + fraction).clamp(0.0, 1.0);
         _brightnessTouched = true;
         unawaited(ScreenBrightness().setApplicationScreenBrightness(_brightness).catchError((_) {}));
-        setState(() => _valueFeedback = (icon: Icons.brightness_6_outlined, value: _brightness));
+        _valueFeedback.value = (icon: Icons.brightness_6_outlined, value: _brightness);
       case PlayerSide.right:
         _volume = (_volume + fraction * 100).clamp(0.0, 100.0);
         unawaited(_player.setVolume(_volume));
-        setState(() => _valueFeedback = (icon: Icons.volume_up_outlined, value: _volume / 100));
+        _valueFeedback.value = (icon: Icons.volume_up_outlined, value: _volume / 100);
     }
   }
 
-  void _onVerticalDragEnd() => setState(() => _valueFeedback = null);
+  void _onVerticalDragEnd() => _valueFeedback.value = null;
 
   void _onPopInvoked(bool didPop, Object? result) {
     if (didPop || !_fullscreen) return;

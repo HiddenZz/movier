@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:movier/common/extensions/build_context.dart';
 import 'package:movier/common/theme/player_theme.dart';
-import 'package:movier/feature/player/controller/media_controller.dart';
 import 'package:movier/feature/player/widget/player_menus.dart';
 import 'package:movier/feature/player/widget/player_seek_bar.dart';
 
@@ -16,7 +15,6 @@ class PlayerControls extends StatelessWidget {
   /// {@macro player_controls}
   const PlayerControls({
     required this.contentUuid,
-    required this.state,
     required this.player,
     required this.visible,
     required this.fullscreen,
@@ -32,7 +30,6 @@ class PlayerControls extends StatelessWidget {
 
   final String contentUuid;
   final String? title;
-  final MediaState state;
   final Player player;
   final bool visible;
   final bool fullscreen;
@@ -77,7 +74,6 @@ class PlayerControls extends StatelessWidget {
                   ),
                   _BottomBar(
                     contentUuid: contentUuid,
-                    state: state,
                     player: player,
                     fullscreen: fullscreen,
                     scrubbing: scrubbing,
@@ -169,7 +165,6 @@ class _PlayButton extends StatelessWidget {
 class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.contentUuid,
-    required this.state,
     required this.player,
     required this.fullscreen,
     required this.scrubbing,
@@ -180,7 +175,6 @@ class _BottomBar extends StatelessWidget {
   });
 
   final String contentUuid;
-  final MediaState state;
   final Player player;
   final bool fullscreen;
   final bool scrubbing;
@@ -210,8 +204,8 @@ class _BottomBar extends StatelessWidget {
           children: [
             const Spacer(),
             // Re-opening the demuxer mid-drag would fight the scrub.
-            PlayerQualityButton(contentUuid: contentUuid, state: state, enabled: !scrubbing),
-            PlayerRateButton(state: state),
+            PlayerQualityButton(contentUuid: contentUuid, enabled: !scrubbing),
+            const PlayerRateButton(),
             IconButton(
               onPressed: () {
                 onInteraction();
