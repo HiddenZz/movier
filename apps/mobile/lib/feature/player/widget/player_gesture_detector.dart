@@ -84,6 +84,17 @@ class _PlayerGestureDetectorState extends State<PlayerGestureDetector> {
   }
   /* #endregion */
 
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTapUp: _onTapUp,
+    onPanStart: _onPanStart,
+    onPanUpdate: _onPanUpdate,
+    onPanEnd: (_) => _onPanEnd(),
+    onPanCancel: _onPanEnd,
+    child: widget.child,
+  );
+
   PlayerSide _sideOf(Offset localPosition) =>
       localPosition.dx < context.size!.width / 2 ? PlayerSide.left : PlayerSide.right;
 
@@ -166,15 +177,4 @@ class _PlayerGestureDetectorState extends State<PlayerGestureDetector> {
     _panSide = null;
     _panOffset = Offset.zero;
   }
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTapUp: _onTapUp,
-    onPanStart: _onPanStart,
-    onPanUpdate: _onPanUpdate,
-    onPanEnd: (_) => _onPanEnd(),
-    onPanCancel: _onPanEnd,
-    child: widget.child,
-  );
 }

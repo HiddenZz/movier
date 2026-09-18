@@ -52,3 +52,8 @@ fl-gen:
 fl-lgen:
     fvm flutter gen-l10n
     fvm dart format lib
+
+# Dart format
+[working-directory('apps/mobile')]
+fl-format:
+    fvm dart format lib
