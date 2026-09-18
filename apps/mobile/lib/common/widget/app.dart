@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:movier/common/navigator/app_navigator.dart';
 import 'package:movier/common/theme/theme_data_factory.dart';
+import 'package:movier/l10n/app_localizations.dart';
 
 /// {@template app}
 /// App widget.
@@ -23,6 +25,13 @@ class _AppState extends State<App> {
   Widget build(BuildContext context) => MaterialApp(
     key: key,
     theme: ThemeDataFactory.light(),
+    localizationsDelegates: const <LocalizationsDelegate<Object?>>[
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: AppLocalizations.supportedLocales,
     home: AppNavigator(pages: <AppPage>[HomeRoute()]),
   );
 }

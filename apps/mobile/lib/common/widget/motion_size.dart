@@ -3,13 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:motor/motor.dart';
 
 class MotionSize extends StatefulWidget {
-  const MotionSize({
-    required this.child,
-    required this.visible,
-    required this.motion,
-    super.key,
-    this.onHidden,
-  });
+  const MotionSize({required this.child, required this.visible, required this.motion, super.key, this.onHidden});
 
   final Widget child;
   final bool visible;
@@ -42,8 +36,7 @@ class _MotionSizeState extends State<MotionSize> {
       from: 0,
       motion: widget.motion,
       onAnimationStatusChanged: _onAnimationStatusChanged,
-      builder: (context, height, child) =>
-          _ClipToHeight(height: height, onMeasured: _onHeightChanged, child: child!),
+      builder: (context, height, child) => _ClipToHeight(height: height, onMeasured: _onHeightChanged, child: child!),
       child: widget.child,
     );
   }
@@ -87,11 +80,7 @@ class _RenderClipToHeight extends RenderProxyBox {
       return;
     }
     child!.layout(
-      BoxConstraints(
-        minWidth: constraints.minWidth,
-        maxWidth: constraints.maxWidth,
-        maxHeight: double.infinity,
-      ),
+      BoxConstraints(minWidth: constraints.minWidth, maxWidth: constraints.maxWidth, maxHeight: double.infinity),
       parentUsesSize: true,
     );
     final natural = child!.size.height;
@@ -123,11 +112,6 @@ class _RenderClipToHeight extends RenderProxyBox {
   @override
   void paint(PaintingContext context, Offset offset) {
     if (child == null) return;
-    context.pushClipRect(
-      needsCompositing,
-      offset,
-      Offset.zero & size,
-      (ctx, o) => ctx.paintChild(child!, o),
-    );
+    context.pushClipRect(needsCompositing, offset, Offset.zero & size, (ctx, o) => ctx.paintChild(child!, o));
   }
 }

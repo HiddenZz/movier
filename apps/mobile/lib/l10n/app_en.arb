@@ -1,0 +1,67 @@
+{
+  "@@locale": "en",
+
+  "playerQuality": "Quality",
+  "@playerQuality": {
+    "description": "Title of the video quality selection menu"
+  },
+  "playerQualityAuto": "Auto",
+  "@playerQualityAuto": {
+    "description": "Adaptive quality option, plays the HLS master playlist"
+  },
+  "playerSpeed": "Speed",
+  "@playerSpeed": {
+    "description": "Title of the playback speed selection menu"
+  },
+  "playerSpeedValue": "{rate}×",
+  "@playerSpeedValue": {
+    "description": "Playback speed menu entry, e.g. 1.5×",
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "playerRetry": "Retry",
+  "@playerRetry": {
+    "description": "Button that reloads the stream after a failure"
+  },
+
+  "errorConnection": "No connection to the server.",
+  "@errorConnection": {
+    "description": "Shown when the host is unreachable"
+  },
+  "errorTimeout": "The server took too long to respond.",
+  "@errorTimeout": {
+    "description": "Shown on connect, send or receive timeout"
+  },
+  "errorNotFound": "The content was not found.",
+  "@errorNotFound": {
+    "description": "Shown on HTTP 404 for a contentUuid"
+  },
+  "errorServer": "Server error ({status}).",
+  "@errorServer": {
+    "description": "Shown on HTTP 5xx",
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
+  "errorBadResponse": "The server returned an unexpected response.",
+  "@errorBadResponse": {
+    "description": "Shown on an unhandled non-2xx status or an unparseable body"
+  },
+  "errorMalformedPlaylist": "The stream manifest is malformed.",
+  "@errorMalformedPlaylist": {
+    "description": "Shown when master.m3u8 cannot be parsed"
+  },
+  "errorPlayback": "Playback failed.",
+  "@errorPlayback": {
+    "description": "Shown for an error reported by the player itself"
+  },
+  "errorUnknown": "Something went wrong.",
+  "@errorUnknown": {
+    "description": "Fallback for an unrecognised error type"
+  }
+}
