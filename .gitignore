@@ -74,3 +74,6 @@ deploy/downloads/
 deploy/miniosolo/
 deploy/local.env
 deploy/docker-compose.override.yml
+
+# FVM Version Cache
+.fvm/
