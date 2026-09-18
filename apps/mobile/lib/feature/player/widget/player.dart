@@ -49,9 +49,20 @@ class _PlayerViewState extends State<PlayerView> {
   /// the finger instead of the incoming position ticks.
   Duration? _scrubPosition;
 
-  /// Double-tap seek hint, shown for [_feedbackDuration] after each seek.
+  /// Double-tap seek hint, shown while the burst accumulates. Taking it down
+  /// and applying the seek are the same moment — see [_commitBurst].
   final ValueNotifier<({PlayerSide side, int seconds})?> _seekFeedback = ValueNotifier(null);
   Timer? _seekFeedbackTimer;
+
+  /// Position the current double-tap burst seeks from, captured on its first
+  /// tap. Every tap of the burst offsets this base instead of the live
+  /// position, which lags behind the pending seeks. Null when no burst is
+  /// running.
+  Duration? _seekBase;
+
+  /// Where the burst has seeked to so far. Held back until it ends, so a run
+  /// of taps costs the player a single seek instead of one per tap.
+  Duration? _pendingSeek;
 
   /// Brightness/volume hint, shown while a vertical drag is in progress.
   final ValueNotifier<({IconData icon, double value})?> _valueFeedback = ValueNotifier(null);
@@ -76,6 +87,10 @@ class _PlayerViewState extends State<PlayerView> {
   void dispose() {
     _controlsTimer?.cancel();
     _seekFeedbackTimer?.cancel();
+    // Leaving mid-burst must not swallow the seek it accumulated. Applied
+    // directly: the notifiers below are about to go, so [_commitBurst] would
+    // notify listeners that are already unmounting.
+    if (_pendingSeek case final target?) _player.seek(target).ignore();
     _controlsVisible.dispose();
     _seekFeedback.dispose();
     _valueFeedback.dispose();
@@ -117,10 +132,7 @@ class _PlayerViewState extends State<PlayerView> {
               ),
               ValueListenableBuilder(
                 valueListenable: _seekFeedback,
-                builder: (context, feedback, _) => switch (feedback) {
-                  final value? => PlayerSeekFeedback(side: value.side, seconds: value.seconds),
-                  _ => const SizedBox.shrink(),
-                },
+                builder: (context, feedback, _) => PlayerSeekFeedback(feedback: feedback),
               ),
               ValueListenableBuilder(
                 valueListenable: _valueFeedback,
@@ -142,7 +154,10 @@ class _PlayerViewState extends State<PlayerView> {
                   onInteraction: _restartControlsTimer,
                   onToggleFullscreen: _toggleFullscreen,
                   onClose: () => AppNavigator.pop(context),
-                  onSeek: (position) => unawaited(_player.seek(_clamp(position))),
+                  onSeek: (position) {
+                    _cancelBurst();
+                    unawaited(_player.seek(_clamp(position)));
+                  },
                 ),
               ),
             ],
@@ -175,33 +190,54 @@ class _PlayerViewState extends State<PlayerView> {
     await (next ? $enterPlayerFullscreen() : $exitPlayerFullscreen());
   }
 
-  void _onDoubleTap(PlayerSide side, int count) {
-    final offset = _seekStep * count;
-    final target = _clamp(switch (side) {
-      PlayerSide.left => _player.state.position - offset,
-      PlayerSide.right => _player.state.position + offset,
-    });
+  void _onDoubleTap(PlayerSide side, int count) => _playerDurationGuard((duration) {
+    // A burst that starts before the previous one was applied continues from
+    // its target, which the player has not been told about yet.
+    final base = (count == 1 ? null : _seekBase) ?? _pendingSeek ?? _player.state.position;
+    _seekBase = base;
 
-    unawaited(_player.seek(target));
+    final offset = _seekStep * count;
+    _pendingSeek = _clamp(switch (side) {
+      PlayerSide.left => base - offset,
+      PlayerSide.right => base + offset,
+    });
 
     _seekFeedback.value = (side: side, seconds: offset.inSeconds);
     _seekFeedbackTimer?.cancel();
-    _seekFeedbackTimer = Timer(_feedbackDuration, () => _seekFeedback.value = null);
+    _seekFeedbackTimer = Timer(_feedbackDuration, _commitBurst);
+  });
+
+  /// Applies the position the burst accumulated and takes its hint down.
+  void _commitBurst() {
+    final target = _cancelBurst();
+    if (target != null) _player.seek(target).ignore();
+  }
+
+  /// Drops the pending burst without seeking, returning the target it held.
+  Duration? _cancelBurst() {
+    final target = _pendingSeek;
+    _seekFeedbackTimer?.cancel();
+    _seekBase = null;
+    _pendingSeek = null;
+    _seekFeedback.value = null;
+
+    return target;
   }
 
   void _onScrubStart() {
     _controlsTimer?.cancel();
     _controlsVisible.value = true;
-    setState(() => _scrubPosition = _player.state.position);
+    // The pending burst becomes the starting point of the scrub instead of
+    // landing on top of it once its timer fires.
+    final pending = _cancelBurst();
+    setState(() => _scrubPosition = pending ?? _player.state.position);
   }
 
-  void _onScrubUpdate(double fraction) {
-    final duration = _player.state.duration;
-    if (duration == Duration.zero) return;
+  void _onScrubUpdate(double fraction) => _playerDurationGuard((duration) {
     final span = duration < _maxScrubSpan ? duration : _maxScrubSpan;
 
     setState(() => _scrubPosition = _clamp((_scrubPosition ?? _player.state.position) + span * fraction));
-  }
+  });
 
   void _onScrubEnd() {
     final target = _scrubPosition;
@@ -241,6 +277,12 @@ class _PlayerViewState extends State<PlayerView> {
   void _onPopInvoked(bool didPop, Object? result) {
     if (didPop || !_fullscreen) return;
     unawaited(_toggleFullscreen());
+  }
+
+  void _playerDurationGuard(ValueSetter fn) {
+    final duration = _player.state.duration;
+    if (_player.state.duration == Duration.zero) return;
+    fn(duration);
   }
 }
 

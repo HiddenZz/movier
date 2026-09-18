@@ -28,9 +28,8 @@ torrent:
 server:
   port: 8084
 
-
 app:
-  public-base-url: ${PUBLIC_BASE_URL:http://10.0.2.2:8084}
+  public-base-url: ${PUBLIC_BASE_URL:http://127.0.0.1:8084}
 
 
 spring:

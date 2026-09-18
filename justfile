@@ -57,3 +57,7 @@ fl-lgen:
 [working-directory('apps/mobile')]
 fl-format:
     fvm dart format lib
+
+[working-directory('apps/mobile')]
+fl-cl:
+    fvm flutter clean

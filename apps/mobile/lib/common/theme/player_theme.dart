@@ -26,7 +26,7 @@ class PlayerTheme extends InheritedTheme {
 class PlayerThemeData extends ThemeExtension<PlayerThemeData> {
   const PlayerThemeData({
     this.background = const Color(0xFF000000),
-    this.scrim = const Color(0x99000000),
+    this.scrim = const Color(0x30000000),
     this.foreground = const Color(0xFFFFFFFF),
     this.foregroundMuted = const Color(0xB3FFFFFF),
     this.progress = const Color(0xFF4A7C59),
