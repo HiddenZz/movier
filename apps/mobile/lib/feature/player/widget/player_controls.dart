@@ -194,10 +194,8 @@ class _BottomBar extends StatelessWidget {
           child: PlayerSeekBar(
             player: player,
             scrubPosition: scrubPosition,
-            onSeek: (position) {
-              onInteraction();
-              onSeek(position);
-            },
+            onInteraction: onInteraction,
+            onSeek: onSeek,
           ),
         ),
         Row(

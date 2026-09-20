@@ -15,27 +15,48 @@ String $formatDuration(Duration duration) {
 
 /// Progress bar with a buffer track, driven straight off the player streams.
 ///
-/// While [scrubPosition] is set the bar follows the finger instead of the
-/// player, so a drag does not fight with incoming position ticks.
-class PlayerSeekBar extends StatelessWidget {
-  const PlayerSeekBar({required this.player, required this.onSeek, super.key, this.scrubPosition});
+/// While the bar is dragged, or while [scrubPosition] is set by the gesture
+/// layer, it follows the finger instead of the player, so a drag does not
+/// fight with incoming position ticks.
+class PlayerSeekBar extends StatefulWidget {
+  const PlayerSeekBar({
+    required this.player,
+    required this.onSeek,
+    required this.onInteraction,
+    super.key,
+    this.scrubPosition,
+  });
 
   final Player player;
   final Duration? scrubPosition;
   final ValueChanged<Duration> onSeek;
 
+  /// Called on every touch of the bar, so the controls stay up for the whole
+  /// drag and not only until the auto-hide timer runs out.
+  final VoidCallback onInteraction;
+
+  @override
+  State<PlayerSeekBar> createState() => _PlayerSeekBarState();
+}
+
+class _PlayerSeekBarState extends State<PlayerSeekBar> {
+  /// Position the thumb is held at while the bar itself is dragged. Owns the
+  /// displayed position for the whole drag, so position ticks cannot pull the
+  /// thumb back from under the finger; the seek happens once, on release.
+  Duration? _dragPosition;
+
   @override
   Widget build(BuildContext context) => StreamBuilder<Duration>(
-    initialData: player.state.duration,
-    stream: player.stream.duration,
+    initialData: widget.player.state.duration,
+    stream: widget.player.stream.duration,
     builder: (context, durationSnapshot) {
       final duration = durationSnapshot.data ?? Duration.zero;
 
       return StreamBuilder<Duration>(
-        initialData: player.state.position,
-        stream: player.stream.position,
+        initialData: widget.player.state.position,
+        stream: widget.player.stream.position,
         builder: (context, positionSnapshot) {
-          final position = scrubPosition ?? positionSnapshot.data ?? Duration.zero;
+          final position = _dragPosition ?? widget.scrubPosition ?? positionSnapshot.data ?? Duration.zero;
 
           return Row(
             spacing: 12,
@@ -43,13 +64,15 @@ class PlayerSeekBar extends StatelessWidget {
               _Timestamp(value: position),
               Expanded(
                 child: StreamBuilder<Duration>(
-                  initialData: player.state.buffer,
-                  stream: player.stream.buffer,
+                  initialData: widget.player.state.buffer,
+                  stream: widget.player.stream.buffer,
                   builder: (context, bufferSnapshot) => _Track(
                     position: position,
                     buffer: bufferSnapshot.data ?? Duration.zero,
                     duration: duration,
-                    onSeek: onSeek,
+                    onDragStart: _onDragStart,
+                    onDragUpdate: _onDragUpdate,
+                    onDragEnd: _onDragEnd,
                   ),
                 ),
               ),
@@ -60,6 +83,22 @@ class PlayerSeekBar extends StatelessWidget {
       );
     },
   );
+
+  void _onDragStart(Duration position) {
+    widget.onInteraction();
+    setState(() => _dragPosition = position);
+  }
+
+  void _onDragUpdate(Duration position) {
+    widget.onInteraction();
+    setState(() => _dragPosition = position);
+  }
+
+  void _onDragEnd(Duration position) {
+    widget.onInteraction();
+    setState(() => _dragPosition = null);
+    widget.onSeek(position);
+  }
 }
 
 class _Timestamp extends StatelessWidget {
@@ -75,12 +114,21 @@ class _Timestamp extends StatelessWidget {
 }
 
 class _Track extends StatelessWidget {
-  const _Track({required this.position, required this.buffer, required this.duration, required this.onSeek});
+  const _Track({
+    required this.position,
+    required this.buffer,
+    required this.duration,
+    required this.onDragStart,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+  });
 
   final Duration position;
   final Duration buffer;
   final Duration duration;
-  final ValueChanged<Duration> onSeek;
+  final ValueChanged<Duration> onDragStart;
+  final ValueChanged<Duration> onDragUpdate;
+  final ValueChanged<Duration> onDragEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -114,10 +162,14 @@ class _Track extends StatelessWidget {
           child: Slider(
             value: total == 0 ? 0 : position.inMilliseconds.clamp(0, total).toDouble(),
             max: total == 0 ? 1 : total.toDouble(),
-            onChanged: total == 0 ? null : (value) => onSeek(Duration(milliseconds: value.round())),
+            onChanged: total == 0 ? null : (value) => onDragUpdate(_at(value)),
+            onChangeStart: (value) => onDragStart(_at(value)),
+            onChangeEnd: (value) => onDragEnd(_at(value)),
           ),
         ),
       ],
     );
   }
+
+  Duration _at(double value) => Duration(milliseconds: value.round());
 }

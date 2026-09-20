@@ -169,6 +169,7 @@ class _PlayerViewState extends State<PlayerView> {
 
   void _restartControlsTimer() {
     _controlsTimer?.cancel();
+
     _controlsTimer = Timer(_controlsTimeout, () => _controlsVisible.value = false);
   }
 
@@ -263,7 +264,7 @@ class _PlayerViewState extends State<PlayerView> {
       case PlayerSide.left:
         _brightness = (_brightness + fraction).clamp(0.0, 1.0);
         _brightnessTouched = true;
-        unawaited(ScreenBrightness().setApplicationScreenBrightness(_brightness).catchError((_) {}));
+        ScreenBrightness().setApplicationScreenBrightness(_brightness).ignore();
         _valueFeedback.value = (icon: Icons.brightness_6_outlined, value: _brightness);
       case PlayerSide.right:
         _volume = (_volume + fraction * 100).clamp(0.0, 100.0);
