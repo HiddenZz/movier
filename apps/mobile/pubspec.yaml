@@ -28,6 +28,8 @@ dependencies:
   media_kit_libs_ios_video: ^1.1.4
   media_kit_libs_macos_video: ^1.1.4
   screen_brightness: ^2.1.2
+  movier_window:
+    path: packages/movier_window
 
 dev_dependencies:
   flutter_test:

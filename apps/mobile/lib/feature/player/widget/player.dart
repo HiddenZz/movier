@@ -3,12 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:movier/common/env/platform/fullscreen_mode.dart';
+import 'package:movier/common/env/platform_capabilities.dart';
 import 'package:movier/common/extensions/build_context.dart';
 import 'package:movier/common/navigator/app_navigator.dart';
 import 'package:movier/common/theme/player_theme.dart';
 import 'package:movier/common/util/error_util.dart';
 import 'package:movier/feature/player/controller/media_controller.dart';
-import 'package:movier/feature/player/widget/fullscreen.dart';
 import 'package:movier/feature/player/widget/player_controls.dart';
 import 'package:movier/feature/player/widget/player_gesture_detector.dart';
 import 'package:movier/feature/player/widget/player_gesture_feedback.dart';
@@ -38,8 +39,8 @@ class _PlayerViewState extends State<PlayerView> {
   static const Duration _maxScrubSpan = Duration(minutes: 10);
 
   late final MediaController mediaController;
-
-  bool _fullscreen = false;
+  late final FullscreenMode fullscreen;
+  late final bool _interceptsBackInFullscreen;
 
   /// Controls overlay visibility, auto-hidden after [_controlsTimeout].
   final ValueNotifier<bool> _controlsVisible = ValueNotifier(true);
@@ -82,6 +83,8 @@ class _PlayerViewState extends State<PlayerView> {
 
     mediaController = context.scops.player.mediaController;
     mediaController.load(widget.contentUuid);
+    fullscreen = context.scops.player.fullscreen;
+    _interceptsBackInFullscreen = PlatformCapabilities.current().interceptsBackInFullscreen;
 
     _restartControlsTimer();
     unawaited(_primeBrightness());
@@ -114,8 +117,6 @@ class _PlayerViewState extends State<PlayerView> {
     _controlsVisible.dispose();
     _seekFeedback.dispose();
     _valueFeedback.dispose();
-    // Leaving straight from fullscreen must not strand the app in landscape.
-    if (_fullscreen) $exitPlayerFullscreen().ignore();
     if (_brightnessTouched) ScreenBrightness().resetApplicationScreenBrightness().ignore();
 
     super.dispose();
@@ -123,9 +124,13 @@ class _PlayerViewState extends State<PlayerView> {
   /* #endregion */
 
   @override
-  Widget build(BuildContext context) => PopScope(
-    canPop: !_fullscreen,
-    onPopInvokedWithResult: _onPopInvoked,
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+    valueListenable: fullscreen,
+    builder: (context, isFullscreen, child) => PopScope(
+      canPop: !(_interceptsBackInFullscreen && isFullscreen),
+      onPopInvokedWithResult: _onPopInvoked,
+      child: child!,
+    ),
     child: ColoredBox(
       color: PlayerTheme.of(context).background,
       child: ListenableBuilder(
@@ -168,11 +173,9 @@ class _PlayerViewState extends State<PlayerView> {
                   title: widget.title,
                   player: _player,
                   visible: visible,
-                  fullscreen: _fullscreen,
                   scrubPosition: _scrubPosition,
                   scrubbing: _scrubPosition != null,
                   onInteraction: _restartControlsTimer,
-                  onToggleFullscreen: _toggleFullscreen,
                   onClose: () => AppNavigator.pop(context),
                   onSeek: (position) {
                     _cancelBurst();
@@ -204,12 +207,6 @@ class _PlayerViewState extends State<PlayerView> {
     final value when value > _player.state.duration => _player.state.duration,
     final value => value,
   };
-
-  Future<void> _toggleFullscreen() async {
-    final next = !_fullscreen;
-    setState(() => _fullscreen = next);
-    await (next ? $enterPlayerFullscreen() : $exitPlayerFullscreen());
-  }
 
   void _onDoubleTap(PlayerSide side, int count) => _playerDurationGuard((duration) {
     // A burst that starts before the previous one was applied continues from
@@ -294,8 +291,8 @@ class _PlayerViewState extends State<PlayerView> {
   void _onVerticalDragEnd() => _valueFeedback.value = null;
 
   void _onPopInvoked(bool didPop, Object? result) {
-    if (didPop || !_fullscreen) return;
-    unawaited(_toggleFullscreen());
+    if (didPop || !fullscreen.value) return;
+    unawaited(fullscreen.exit());
   }
 
   void _playerDurationGuard(ValueSetter fn) {
