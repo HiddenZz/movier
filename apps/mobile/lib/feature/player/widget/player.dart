@@ -66,6 +66,9 @@ class _PlayerViewState extends State<PlayerView> {
 
   /// Brightness/volume hint, shown while a vertical drag is in progress.
   final ValueNotifier<({IconData icon, double value})?> _valueFeedback = ValueNotifier(null);
+
+  /// Current application brightness, primed in [initState]. A drag has to
+  /// offset it on its very first frame, which leaves no room to await a read.
   double _brightness = 0;
   double _volume = 100;
   bool _brightnessTouched = false;
@@ -81,6 +84,23 @@ class _PlayerViewState extends State<PlayerView> {
     mediaController.load(widget.contentUuid);
 
     _restartControlsTimer();
+    unawaited(_primeBrightness());
+  }
+
+  /// Reads the screen brightness ahead of any gesture that needs it. A drag
+  /// that got there first owns the value, so its result is dropped.
+  Future<void> _primeBrightness() async {
+    Future<double?> system() async {
+      try {
+        return await ScreenBrightness().application;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final brightness = await system();
+    if (!mounted || brightness == null || _brightnessTouched) return;
+    _brightness = brightness;
   }
 
   @override
@@ -247,11 +267,9 @@ class _PlayerViewState extends State<PlayerView> {
     if (target != null) unawaited(_player.seek(target));
   }
 
-  Future<void> _onVerticalDragStart(PlayerSide side) async {
+  void _onVerticalDragStart(PlayerSide side) {
     switch (side) {
       case PlayerSide.left:
-        _brightness = await ScreenBrightness().application.catchError((_) => 0.0);
-        if (!mounted) return;
         _valueFeedback.value = (icon: Icons.brightness_6_outlined, value: _brightness);
       case PlayerSide.right:
         _volume = _player.state.volume;
