@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:movier/common/theme/player_theme.dart';
 import 'package:movier/common/theme/smooth_border_theme.dart';
 
 abstract class ThemeDataFactory {
@@ -49,7 +50,10 @@ abstract class ThemeDataFactory {
       labelSmall: bodyStyle.copyWith(fontSize: 11, fontWeight: FontWeight.w600, height: 1.4, letterSpacing: 0.5),
     ).apply(bodyColor: onBackground, displayColor: onBackground);
 
-    final extensions = <ThemeExtension<Object?>>{SmoothBorderThemeData(color: Color(0xffC4C8BC))};
+    final extensions = <ThemeExtension<Object?>>{
+      SmoothBorderThemeData(color: Color(0xffC4C8BC)),
+      PlayerThemeData(progress: primary),
+    };
 
     return ThemeData(
       useMaterial3: true,
