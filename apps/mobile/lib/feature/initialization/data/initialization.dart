@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:l/l.dart';
+import 'package:movier/common/env/platform_capabilities.dart';
 import 'package:movier/common/model/dependencies.dart';
 import 'package:movier/feature/initialization/data/initialize_dependencies.dart';
 
@@ -16,7 +17,9 @@ Future<Dependencies> $initializeApp({
   try {
     binding = WidgetsFlutterBinding.ensureInitialized()..deferFirstFrame();
 
-    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
+    if (PlatformCapabilities.current().supportsOrientationLock) {
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
+    }
 
     await _catchExceptions();
     final dependencies = await $initializeDependencies(onProgress).timeout(const Duration(minutes: 3));

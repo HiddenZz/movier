@@ -14,6 +14,19 @@ feature first подход; Каждая фича выносится в отде
 
 - docs/codestyle.md
 
+## platforms
+
+Целевые платформы — iOS, Android и macOS
+
+Платформенные различия резолвятся в одном месте — `common/env/platform_capabilities.dart`.
+Вместо `if (Platform.isMacOS)` по дереву спрашивай про возможность
+(`supportsOrientationLock`, `supportsScreenBrightness`, `usesPointerInput`).
+Внутри `defaultTargetPlatform`, а не `dart:io`: в модуле есть каталог `web/`.
+
+Сеть macos ходит через `com.apple.security.network.client`
+в обоих entitlements-файлах, plain HTTP к `localhost` разрешён через
+`NSAllowsLocalNetworking` в `macos/Runner/Info.plist`.
+
 ## deps
 
 **navigator** - кастомный навигатор в /common/navigator/; Добавляй роуты по необходимости, если в навигаторе нет необходимого апи для решения проблемы - расширяй отдельной задачей;
