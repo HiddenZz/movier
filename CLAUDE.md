@@ -39,12 +39,6 @@ docs/              документация уровня системы
 (`TMDB_API_TOKEN`, `JACKETT_API_KEY`) — файл не в git, шаблон
 в `.env.example`.
 
-Клиент:
-
-```bash
-cd apps/mobile && flutter pub get && flutter run
-```
-
 `apps/mobile` намеренно не включён в `settings.gradle` — Flutter собирает
 свою Android-часть сам.
 
