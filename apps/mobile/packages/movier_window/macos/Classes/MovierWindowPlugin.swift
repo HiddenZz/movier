@@ -8,10 +8,24 @@ public class MovierWindowPlugin: NSObject, FlutterPlugin, WindowFullscreenHostAp
   private weak var window: NSWindow?
   private let flutterApi: WindowFullscreenFlutterApi
 
+  /// How long a transition is assumed to run after `willEnter`/`willExit`.
+  /// The animation itself takes well under a second.
+  private static let transitionTimeout: TimeInterval = 2
+
+  /// When the current transition started, from a monotonic clock, or `nil`
+  /// once it finished. Tracked from `willEnter`/`willExit` because
+  /// `toggleFullScreen` itself reports nothing back.
+  private var transitionStartedAt: TimeInterval?
+
   /// macOS ignores `toggleFullScreen` while an animation is already running.
-  /// Tracked from `willEnter`/`willExit` because `toggleFullScreen` itself
-  /// reports nothing back.
-  private var isTransitioning = false
+  ///
+  /// Expires on its own: a cancelled transition reports no `didEnter`/`didExit`
+  /// (AppKit tells that only to the window delegate, which this plugin is not),
+  /// so a plain flag would stay raised and block fullscreen for good.
+  private var isTransitioning: Bool {
+    guard let transitionStartedAt else { return false }
+    return ProcessInfo.processInfo.systemUptime - transitionStartedAt < Self.transitionTimeout
+  }
 
   init(window: NSWindow?, flutterApi: WindowFullscreenFlutterApi) {
     self.window = window
@@ -40,16 +54,16 @@ public class MovierWindowPlugin: NSObject, FlutterPlugin, WindowFullscreenHostAp
   }
 
   @objc private func willTransition(_ notification: Notification) {
-    isTransitioning = true
+    transitionStartedAt = ProcessInfo.processInfo.systemUptime
   }
 
   @objc private func didEnter(_ notification: Notification) {
-    isTransitioning = false
+    transitionStartedAt = nil
     flutterApi.onFullscreenChanged(fullscreen: true) { _ in }
   }
 
   @objc private func didExit(_ notification: Notification) {
-    isTransitioning = false
+    transitionStartedAt = nil
     flutterApi.onFullscreenChanged(fullscreen: false) { _ in }
   }
 
