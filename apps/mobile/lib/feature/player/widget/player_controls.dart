@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:movier/common/extensions/build_context.dart';
@@ -17,10 +19,8 @@ class PlayerControls extends StatelessWidget {
     required this.contentUuid,
     required this.player,
     required this.visible,
-    required this.fullscreen,
     required this.scrubbing,
     required this.onInteraction,
-    required this.onToggleFullscreen,
     required this.onClose,
     required this.onSeek,
     super.key,
@@ -32,11 +32,9 @@ class PlayerControls extends StatelessWidget {
   final String? title;
   final Player player;
   final bool visible;
-  final bool fullscreen;
   final bool scrubbing;
   final Duration? scrubPosition;
   final VoidCallback onInteraction;
-  final VoidCallback onToggleFullscreen;
   final VoidCallback onClose;
   final ValueChanged<Duration> onSeek;
 
@@ -75,11 +73,9 @@ class PlayerControls extends StatelessWidget {
                   _BottomBar(
                     contentUuid: contentUuid,
                     player: player,
-                    fullscreen: fullscreen,
                     scrubbing: scrubbing,
                     scrubPosition: scrubPosition,
                     onInteraction: onInteraction,
-                    onToggleFullscreen: onToggleFullscreen,
                     onSeek: onSeek,
                   ),
                 ],
@@ -166,54 +162,65 @@ class _BottomBar extends StatelessWidget {
   const _BottomBar({
     required this.contentUuid,
     required this.player,
-    required this.fullscreen,
     required this.scrubbing,
     required this.scrubPosition,
     required this.onInteraction,
-    required this.onToggleFullscreen,
     required this.onSeek,
   });
 
   final String contentUuid;
   final Player player;
-  final bool fullscreen;
   final bool scrubbing;
   final Duration? scrubPosition;
   final VoidCallback onInteraction;
-  final VoidCallback onToggleFullscreen;
   final ValueChanged<Duration> onSeek;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: PlayerSeekBar(
+          player: player,
+          scrubPosition: scrubPosition,
+          onInteraction: onInteraction,
+          onSeek: onSeek,
+        ),
+      ),
+      Row(
+        children: [
+          const Spacer(),
+          // Re-opening the demuxer mid-drag would fight the scrub.
+          PlayerQualityButton(contentUuid: contentUuid, enabled: !scrubbing),
+          const PlayerRateButton(),
+          _FullscreenButton(onInteraction: onInteraction),
+        ],
+      ),
+    ],
+  );
+}
+
+/// Enters/exits fullscreen. Single implementation for every platform — the
+/// platform difference lives in [FullscreenMode], not in this button.
+class _FullscreenButton extends StatelessWidget {
+  const _FullscreenButton({required this.onInteraction});
+
+  final VoidCallback onInteraction;
 
   @override
   Widget build(BuildContext context) {
     final theme = PlayerTheme.of(context);
+    final fullscreen = context.scops.player.fullscreen;
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: PlayerSeekBar(
-            player: player,
-            scrubPosition: scrubPosition,
-            onInteraction: onInteraction,
-            onSeek: onSeek,
-          ),
-        ),
-        Row(
-          children: [
-            const Spacer(),
-            // Re-opening the demuxer mid-drag would fight the scrub.
-            PlayerQualityButton(contentUuid: contentUuid, enabled: !scrubbing),
-            const PlayerRateButton(),
-            IconButton(
-              onPressed: () {
-                onInteraction();
-                onToggleFullscreen();
-              },
-              icon: Icon(fullscreen ? Icons.fullscreen_exit : Icons.fullscreen, color: theme.foreground),
-            ),
-          ],
-        ),
-      ],
+    return ValueListenableBuilder<bool>(
+      valueListenable: fullscreen,
+      builder: (context, isFullscreen, _) => IconButton(
+        onPressed: () {
+          onInteraction();
+          unawaited(fullscreen.toggle());
+        },
+        icon: Icon(isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen, color: theme.foreground),
+      ),
     );
   }
 }

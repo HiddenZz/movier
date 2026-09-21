@@ -525,6 +525,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.0"
+  movier_window:
+    dependency: "direct main"
+    description:
+      path: "packages/movier_window"
+      relative: true
+    source: path
+    version: "0.1.0"
   octo_image:
     dependency: transitive
     description:

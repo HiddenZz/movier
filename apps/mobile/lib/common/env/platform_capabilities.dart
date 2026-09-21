@@ -11,6 +11,7 @@ final class PlatformCapabilities {
     required this.supportsOrientationLock,
     required this.supportsScreenBrightness,
     required this.usesPointerInput,
+    required this.interceptsBackInFullscreen,
   });
 
   /// Capabilities of the platform the app is currently running on.
@@ -19,11 +20,13 @@ final class PlatformCapabilities {
       supportsOrientationLock: true,
       supportsScreenBrightness: true,
       usesPointerInput: false,
+      interceptsBackInFullscreen: true,
     ),
     _ => const PlatformCapabilities(
       supportsOrientationLock: false,
       supportsScreenBrightness: false,
       usesPointerInput: true,
+      interceptsBackInFullscreen: false,
     ),
   };
 
@@ -38,4 +41,9 @@ final class PlatformCapabilities {
 
   /// Whether input comes from a mouse and keyboard rather than touch.
   final bool usesPointerInput;
+
+  /// Whether the player's back gesture/button should exit fullscreen instead
+  /// of leaving the screen. On macOS, `Esc` already exits native fullscreen
+  /// by itself, so the player must not intercept the second one.
+  final bool interceptsBackInFullscreen;
 }

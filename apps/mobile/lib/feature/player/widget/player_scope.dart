@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:movier/common/env/platform/fullscreen_mode.dart';
 import 'package:movier/common/extensions/build_context.dart';
 import 'package:movier/feature/player/controller/media_controller.dart';
 import 'package:movier/feature/player/data/hls_repository.dart';
@@ -23,6 +24,7 @@ class PlayerScope extends StatefulWidget {
 /// State for widget PlayerScope.
 class _PlayerScopeState extends State<PlayerScope> {
   late final MediaController mediaController;
+  late final FullscreenMode fullscreen;
 
   /* #region Lifecycle */
   @override
@@ -30,22 +32,26 @@ class _PlayerScopeState extends State<PlayerScope> {
     super.initState();
 
     mediaController = MediaController(repository: HlsRepositoryImpl(dio: context.scops.deps.dio));
+    fullscreen = FullscreenMode.current();
   }
 
   @override
   void dispose() {
     mediaController.dispose();
+    fullscreen.dispose();
 
     super.dispose();
   }
   /* #endregion */
 
   @override
-  Widget build(BuildContext context) =>
-      PlayerDependeciesScope(deps: (mediaController: mediaController), child: widget.child);
+  Widget build(BuildContext context) => PlayerDependeciesScope(
+    deps: (mediaController: mediaController, fullscreen: fullscreen),
+    child: widget.child,
+  );
 }
 
-typedef PlayerDependecies = ({MediaController mediaController});
+typedef PlayerDependecies = ({MediaController mediaController, FullscreenMode fullscreen});
 
 /// {@template player_scope}
 /// _PlayerDepsInherited widget.
