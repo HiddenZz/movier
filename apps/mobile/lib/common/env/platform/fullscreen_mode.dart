@@ -72,11 +72,17 @@ class _SystemChromeFullscreen extends ValueNotifier<bool> implements FullscreenM
 class _WindowFullscreen extends ValueNotifier<bool> implements FullscreenMode {
   _WindowFullscreen() : super(false) {
     _window = MovierWindow(onFullscreenChanged: (fullscreen) => value = fullscreen);
-    // Dart state resets on hot restart, the window does not.
-    unawaited(_window.isFullscreen().then((fullscreen) => value = fullscreen));
+    unawaited(
+      _window.isFullscreen().then((fullscreen) {
+        if (_disposed) return;
+        value = fullscreen;
+      }),
+    );
   }
 
   late final MovierWindow _window;
+
+  bool _disposed = false;
 
   @override
   Future<void> enter() => _request(fullscreen: true);
@@ -97,6 +103,7 @@ class _WindowFullscreen extends ValueNotifier<bool> implements FullscreenMode {
 
   @override
   void dispose() {
+    _disposed = true;
     // Leaving the player screen mid-fullscreen must not strand the window.
     // [exit] never touches `value` on this implementation — a notifier must
     // not notify listeners once `super.dispose()` below has run.
