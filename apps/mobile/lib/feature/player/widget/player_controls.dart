@@ -23,6 +23,7 @@ class PlayerControls extends StatelessWidget {
     required this.onInteraction,
     required this.onClose,
     required this.onSeek,
+    required this.onBarHoverChanged,
     super.key,
     this.title,
     this.scrubPosition,
@@ -37,6 +38,9 @@ class PlayerControls extends StatelessWidget {
   final VoidCallback onInteraction;
   final VoidCallback onClose;
   final ValueChanged<Duration> onSeek;
+
+  /// Mouse pointer entered (`true`) or left (`false`) the top or bottom bar.
+  final ValueChanged<bool> onBarHoverChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -66,17 +70,23 @@ class PlayerControls extends StatelessWidget {
             SafeArea(
               child: Column(
                 children: [
-                  _TopBar(title: title, onClose: onClose),
+                  _BarHoverRegion(
+                    onHoverChanged: onBarHoverChanged,
+                    child: _TopBar(title: title, onClose: onClose),
+                  ),
                   Expanded(
                     child: _PlayButton(player: player, onInteraction: onInteraction),
                   ),
-                  _BottomBar(
-                    contentUuid: contentUuid,
-                    player: player,
-                    scrubbing: scrubbing,
-                    scrubPosition: scrubPosition,
-                    onInteraction: onInteraction,
-                    onSeek: onSeek,
+                  _BarHoverRegion(
+                    onHoverChanged: onBarHoverChanged,
+                    child: _BottomBar(
+                      contentUuid: contentUuid,
+                      player: player,
+                      scrubbing: scrubbing,
+                      scrubPosition: scrubPosition,
+                      onInteraction: onInteraction,
+                      onSeek: onSeek,
+                    ),
                   ),
                 ],
               ),
@@ -86,6 +96,26 @@ class PlayerControls extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Reports the mouse resting on a bar, so the controls are not hidden from
+/// under it.
+///
+/// Translucent: taps on the empty part of a bar still reach the gesture layer
+/// below the controls.
+class _BarHoverRegion extends StatelessWidget {
+  const _BarHoverRegion({required this.onHoverChanged, required this.child});
+
+  final ValueChanged<bool> onHoverChanged;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    opaque: false,
+    onEnter: (_) => onHoverChanged(true),
+    onExit: (_) => onHoverChanged(false),
+    child: child,
+  );
 }
 
 class _TopBar extends StatelessWidget {

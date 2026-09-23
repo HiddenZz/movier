@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:movier/common/env/platform/fullscreen_mode.dart';
@@ -38,13 +40,27 @@ class _PlayerViewState extends State<PlayerView> {
   /// Span a full-width horizontal swipe covers, capped for long content.
   static const Duration _maxScrubSpan = Duration(minutes: 10);
 
+  static const Map<ShortcutActivator, Intent> _shortcuts = <ShortcutActivator, Intent>{
+    SingleActivator(LogicalKeyboardKey.space, includeRepeats: false): _PlayPauseIntent(),
+    SingleActivator(LogicalKeyboardKey.arrowLeft): _SeekIntent(PlayerSide.left),
+    SingleActivator(LogicalKeyboardKey.arrowRight): _SeekIntent(PlayerSide.right),
+    SingleActivator(LogicalKeyboardKey.keyF, includeRepeats: false): _ToggleFullscreenIntent(),
+    SingleActivator(LogicalKeyboardKey.escape, includeRepeats: false): _ExitFullscreenIntent(),
+  };
+
   late final MediaController mediaController;
   late final FullscreenMode fullscreen;
   late final bool _interceptsBackInFullscreen;
+  late final bool _usesPointerInput;
+  late final Map<Type, Action<Intent>> _actions;
 
   /// Controls overlay visibility, auto-hidden after [_controlsTimeout].
   final ValueNotifier<bool> _controlsVisible = ValueNotifier(true);
   Timer? _controlsTimer;
+
+  /// Set while the mouse rests on a bar of the controls, which holds off the
+  /// auto-hide until it leaves.
+  bool _pointerOverBar = false;
 
   /// Set while a horizontal drag owns the position, so the seek bar follows
   /// the finger instead of the incoming position ticks.
@@ -84,7 +100,25 @@ class _PlayerViewState extends State<PlayerView> {
     mediaController = context.scops.player.mediaController;
     mediaController.load(widget.contentUuid);
     fullscreen = context.scops.player.fullscreen;
-    _interceptsBackInFullscreen = PlatformCapabilities.current().interceptsBackInFullscreen;
+    final capabilities = PlatformCapabilities.current();
+    _interceptsBackInFullscreen = capabilities.interceptsBackInFullscreen;
+    _usesPointerInput = capabilities.usesPointerInput;
+    _actions = <Type, Action<Intent>>{
+      _PlayPauseIntent: CallbackAction<_PlayPauseIntent>(
+        onInvoke: (_) {
+          _showControls();
+          return _player.playOrPause();
+        },
+      ),
+      _SeekIntent: CallbackAction<_SeekIntent>(onInvoke: (intent) => _onSeekKey(intent.side)),
+      _ToggleFullscreenIntent: CallbackAction<_ToggleFullscreenIntent>(
+        onInvoke: (_) {
+          _showControls();
+          return fullscreen.toggle();
+        },
+      ),
+      _ExitFullscreenIntent: _ExitFullscreenAction(fullscreen: fullscreen, onInvoke: _showControls),
+    };
 
     _restartControlsTimer();
     unawaited(_primeBrightness());
@@ -131,69 +165,97 @@ class _PlayerViewState extends State<PlayerView> {
       onPopInvokedWithResult: _onPopInvoked,
       child: child!,
     ),
-    child: ColoredBox(
-      color: PlayerTheme.of(context).background,
-      child: ListenableBuilder(
-        listenable: mediaController,
-        builder: (context, _) => switch (mediaController.state) {
-          Failure$MediaState(:final error?) => _Failure(
-            error: error,
-            onRetry: () => mediaController.load(widget.contentUuid),
-          ),
-          _ => Stack(
-            fit: StackFit.expand,
-            children: [
-              Video(controller: mediaController.videoController, controls: null),
-              PlayerGestureDetector(
-                onTap: _toggleControls,
-                onDoubleTap: _onDoubleTap,
-                onScrubStart: _onScrubStart,
-                onScrubUpdate: _onScrubUpdate,
-                onScrubEnd: _onScrubEnd,
-                onVerticalDragStart: _onVerticalDragStart,
-                onVerticalDragUpdate: _onVerticalDragUpdate,
-                onVerticalDragEnd: _onVerticalDragEnd,
-                child: const SizedBox.expand(),
-              ),
-              ValueListenableBuilder(
-                valueListenable: _seekFeedback,
-                builder: (context, feedback, _) => PlayerSeekFeedback(feedback: feedback),
-              ),
-              ValueListenableBuilder(
-                valueListenable: _valueFeedback,
-                builder: (context, feedback, _) => switch (feedback) {
-                  final value? => PlayerValueFeedback(icon: value.icon, value: value.value),
-                  _ => const SizedBox.shrink(),
-                },
-              ),
-              ValueListenableBuilder(
-                valueListenable: _controlsVisible,
-                builder: (context, visible, _) => PlayerControls(
-                  contentUuid: widget.contentUuid,
-                  title: widget.title,
-                  player: _player,
-                  visible: visible,
-                  scrubPosition: _scrubPosition,
-                  scrubbing: _scrubPosition != null,
-                  onInteraction: _restartControlsTimer,
-                  onClose: () => AppNavigator.pop(context),
-                  onSeek: (position) {
-                    _cancelBurst();
-                    unawaited(_player.seek(_clamp(position)));
+    child: Actions(
+      actions: _actions,
+      child: Shortcuts(
+        shortcuts: _shortcuts,
+        child: Focus(
+          autofocus: true,
+          child: ColoredBox(
+            color: PlayerTheme.of(context).background,
+            child: ListenableBuilder(
+              listenable: mediaController,
+              builder: (context, _) => switch (mediaController.state) {
+                Failure$MediaState(:final error?) => _Failure(
+                  error: error,
+                  onRetry: () {
+                    _pointerOverBar = false;
+                    mediaController.load(widget.contentUuid);
                   },
                 ),
-              ),
-            ],
+                _ => _PointerActivity(
+                  enabled: _usesPointerInput,
+                  controlsVisible: _controlsVisible,
+                  onMove: _showControls,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Video(controller: mediaController.videoController, controls: null),
+                      PlayerGestureDetector(
+                        onTap: _toggleControls,
+                        onDoubleTap: _onDoubleTap,
+                        onScrubStart: _onScrubStart,
+                        onScrubUpdate: _onScrubUpdate,
+                        onScrubEnd: _onScrubEnd,
+                        onVerticalDragStart: _onVerticalDragStart,
+                        onVerticalDragUpdate: _onVerticalDragUpdate,
+                        onVerticalDragEnd: _onVerticalDragEnd,
+                        child: const SizedBox.expand(),
+                      ),
+                      ValueListenableBuilder(
+                        valueListenable: _seekFeedback,
+                        builder: (context, feedback, _) => PlayerSeekFeedback(feedback: feedback),
+                      ),
+                      ValueListenableBuilder(
+                        valueListenable: _valueFeedback,
+                        builder: (context, feedback, _) => switch (feedback) {
+                          final value? => PlayerValueFeedback(icon: value.icon, value: value.value),
+                          _ => const SizedBox.shrink(),
+                        },
+                      ),
+                      ValueListenableBuilder(
+                        valueListenable: _controlsVisible,
+                        builder: (context, visible, _) => PlayerControls(
+                          contentUuid: widget.contentUuid,
+                          title: widget.title,
+                          player: _player,
+                          visible: visible,
+                          scrubPosition: _scrubPosition,
+                          scrubbing: _scrubPosition != null,
+                          onInteraction: _restartControlsTimer,
+                          onClose: () => AppNavigator.pop(context),
+                          onSeek: (position) {
+                            _cancelBurst();
+                            unawaited(_player.seek(_clamp(position)));
+                          },
+                          onBarHoverChanged: (hovered) {
+                            _pointerOverBar = hovered;
+                            _restartControlsTimer();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              },
+            ),
           ),
-        },
+        ),
       ),
     ),
   );
 
   void _restartControlsTimer() {
     _controlsTimer?.cancel();
+    if (_pointerOverBar) return;
 
     _controlsTimer = Timer(_controlsTimeout, () => _controlsVisible.value = false);
+  }
+
+  /// Brings the controls up on mouse movement or a keyboard shortcut.
+  void _showControls() {
+    _controlsVisible.value = true;
+    _restartControlsTimer();
   }
 
   void _toggleControls() {
@@ -224,6 +286,17 @@ class _PlayerViewState extends State<PlayerView> {
     _seekFeedbackTimer?.cancel();
     _seekFeedbackTimer = Timer(_feedbackDuration, _commitBurst);
   });
+
+  /// Arrow key seek. Joins the running burst on the same side, so a held key
+  /// accumulates into a single seek instead of one per key repeat.
+  void _onSeekKey(PlayerSide side) {
+    _showControls();
+    final count = switch (_seekFeedback.value) {
+      (side: final burstSide, :final seconds) when burstSide == side => seconds ~/ _seekStep.inSeconds + 1,
+      _ => 1,
+    };
+    _onDoubleTap(side, count);
+  }
 
   /// Applies the position the burst accumulated and takes its hint down.
   void _commitBurst() {
@@ -300,6 +373,77 @@ class _PlayerViewState extends State<PlayerView> {
     if (_player.state.duration == Duration.zero) return;
     fn(duration);
   }
+}
+
+class _PlayPauseIntent extends Intent {
+  const _PlayPauseIntent();
+}
+
+class _SeekIntent extends Intent {
+  const _SeekIntent(this.side);
+
+  /// Left seeks back, right seeks forward — same as the double-tap halves.
+  final PlayerSide side;
+}
+
+class _ToggleFullscreenIntent extends Intent {
+  const _ToggleFullscreenIntent();
+}
+
+class _ExitFullscreenIntent extends Intent {
+  const _ExitFullscreenIntent();
+}
+
+/// Exits fullscreen on `Esc`. Disabled outside fullscreen, so the key is not
+/// swallowed and reaches the handlers above the player.
+class _ExitFullscreenAction extends Action<_ExitFullscreenIntent> {
+  _ExitFullscreenAction({required this.fullscreen, required this.onInvoke});
+
+  final FullscreenMode fullscreen;
+  final VoidCallback onInvoke;
+
+  @override
+  bool isEnabled(_ExitFullscreenIntent intent) => fullscreen.value;
+
+  @override
+  Future<void> invoke(_ExitFullscreenIntent intent) {
+    onInvoke();
+    return fullscreen.exit();
+  }
+}
+
+/// Shows the controls on mouse movement and hides the cursor together with
+/// them, so it does not hang over the video.
+///
+/// Reacts to movement rather than to the pointer being over the window —
+/// a resting cursor lets the controls time out.
+class _PointerActivity extends StatelessWidget {
+  const _PointerActivity({
+    required this.enabled,
+    required this.controlsVisible,
+    required this.onMove,
+    required this.child,
+  });
+
+  /// Off on touch platforms, where there is no cursor to follow.
+  final bool enabled;
+  final ValueListenable<bool> controlsVisible;
+  final VoidCallback onMove;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => switch (enabled) {
+    false => child,
+    true => ValueListenableBuilder<bool>(
+      valueListenable: controlsVisible,
+      builder: (context, visible, child) => MouseRegion(
+        cursor: visible ? MouseCursor.defer : SystemMouseCursors.none,
+        onHover: (_) => onMove(),
+        child: child,
+      ),
+      child: child,
+    ),
+  };
 }
 
 class _Failure extends StatelessWidget {
